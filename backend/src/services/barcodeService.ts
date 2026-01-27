@@ -93,17 +93,17 @@ async function detectBarcodeWithOCR(
 export async function detectBarcode(
   imageBuffer: Buffer
 ): Promise<string | null> {
-  // Try zxing first
+  // Use OCR as primary method (more reliable for scanned documents)
+  const ocrResult = await detectBarcodeWithOCR(imageBuffer);
+  if (ocrResult) {
+    return `*${ocrResult}*`;
+  }
+
+  // Fall back to zxing for clean digital barcodes
   const zxingResult = await detectBarcodeWithZxing(imageBuffer);
   if (zxingResult) {
     logger.debug(`Zxing detected barcode: ${zxingResult}`);
     return zxingResult;
-  }
-
-  // Fall back to OCR
-  const ocrResult = await detectBarcodeWithOCR(imageBuffer);
-  if (ocrResult) {
-    return `*${ocrResult}*`;
   }
 
   return null;
