@@ -2,7 +2,7 @@ import chokidar, { FSWatcher } from 'chokidar';
 import path from 'path';
 import { stat } from 'fs/promises';
 import sharp from 'sharp';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { logger } from '../utils/logger';
 import { calculateFileHash, parseLocationInfo, LocationInfo } from '../utils/fileUtils';
 import { storeFile, archiveFile } from './storageService';
@@ -10,6 +10,7 @@ import { processBatch } from './batchProcessor';
 import { setWatcherStatus } from '../routes/settings';
 
 const prisma = new PrismaClient();
+const MAX_REFERENCE_RETRIES = 10;
 
 let watcher: FSWatcher | null = null;
 const DEBOUNCE_MS = 2000;
@@ -90,6 +91,43 @@ async function generateReference(locationCode: string): Promise<string> {
   return `${locationCode}${nextNumber}`;
 }
 
+async function createBatchWithRetry(
+  storeId: number,
+  storageFolder: string,
+  filename: string,
+  fileHash: string,
+  storedPath: string,
+  fileSize: number
+): Promise<{ id: number }> {
+  for (let attempt = 0; attempt < MAX_REFERENCE_RETRIES; attempt++) {
+    const reference = await generateReference(storageFolder);
+
+    try {
+      return await prisma.batch.create({
+        data: {
+          store_id: storeId,
+          reference,
+          file_name: `${fileHash.substring(0, 16)}_${filename}`,
+          file_path: storedPath,
+          file_size_bytes: fileSize,
+          status: 'pending',
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        logger.warn(`Reference collision on ${reference}, retrying (${attempt + 1}/${MAX_REFERENCE_RETRIES})...`);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw new Error(`Failed to create batch after ${MAX_REFERENCE_RETRIES} retries`);
+}
+
 async function processNewFile(filePath: string): Promise<void> {
   const filename = path.basename(filePath);
 
@@ -130,18 +168,14 @@ async function processNewFile(filePath: string): Promise<void> {
       ? await getOrCreateLocation(locationInfo)
       : await getOrCreateUnassigned();
 
-    const reference = await generateReference(storageFolder);
-
-    const batch = await prisma.batch.create({
-      data: {
-        store_id: storeId,
-        reference,
-        file_name: `${fileHash.substring(0, 16)}_${filename}`,
-        file_path: storedPath,
-        file_size_bytes: fileStats.size,
-        status: 'pending',
-      },
-    });
+    const batch = await createBatchWithRetry(
+      storeId,
+      storageFolder,
+      filename,
+      fileHash,
+      storedPath,
+      fileStats.size
+    );
 
     logger.info(`Created batch ${batch.id} for ${locationInfo?.displayName ?? 'UNASSIGNED'}`);
 
