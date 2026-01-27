@@ -24,8 +24,7 @@ async function updateBatchStatus(
 
 async function createDocumentRecord(
   batchId: number,
-  batchReference: string | null,
-  documentNumber: number,
+  storeNumber: string,
   boundary: {
     documentTypeCode: string;
     startPage: number;
@@ -33,17 +32,20 @@ async function createDocumentRecord(
   }
 ): Promise<void> {
   const docType = await getDocumentTypeByCode(boundary.documentTypeCode);
-  const reference = batchReference ? `${batchReference}_${documentNumber}` : null;
 
-  await prisma.document.create({
+  const doc = await prisma.document.create({
     data: {
       batch_id: batchId,
-      reference,
       document_type_id: docType?.id ?? null,
       page_start: boundary.startPage,
       page_end: boundary.endPage,
       status: 'pending',
     },
+  });
+
+  await prisma.document.update({
+    where: { id: doc.id },
+    data: { reference: `${storeNumber}-${doc.id}` },
   });
 }
 
@@ -52,11 +54,14 @@ export async function processBatch(batchId: number): Promise<void> {
 
   const batch = await prisma.batch.findUnique({
     where: { id: batchId },
+    include: { store: true },
   });
 
   if (!batch) {
     throw new Error(`Batch ${batchId} not found`);
   }
+
+  const storeNumber = batch.store.store_number;
 
   if (batch.status === 'processing') {
     throw new Error(`Batch ${batchId} is already being processed`);
@@ -67,10 +72,9 @@ export async function processBatch(batchId: number): Promise<void> {
 
     const boundaries = await analyzeTiff(batch.file_path);
 
-    for (let i = 0; i < boundaries.length; i++) {
-      const boundary = boundaries[i];
+    for (const boundary of boundaries) {
       if (boundary) {
-        await createDocumentRecord(batchId, batch.reference, i + 1, boundary);
+        await createDocumentRecord(batchId, storeNumber, boundary);
       }
     }
 
