@@ -81,7 +81,7 @@ export function Documents() {
       {
         accessorKey: 'batch.store.store_number',
         header: 'Store',
-        cell: ({ row }) => `Store ${row.original.batch.store.store_number}`,
+        cell: ({ row }) => row.original.batch.store.store_number,
       },
       {
         accessorKey: 'documentType.name',
@@ -98,8 +98,23 @@ export function Documents() {
         },
       },
       {
+        id: 'order_number',
+        header: 'Order #',
+        cell: () => <span className="text-gray-400">-</span>,
+      },
+      {
+        id: 'customer_name',
+        header: 'Customer',
+        cell: () => <span className="text-gray-400">-</span>,
+      },
+      {
+        id: 'document_date',
+        header: 'Document Date',
+        cell: () => <span className="text-gray-400">-</span>,
+      },
+      {
         accessorKey: 'created_at',
-        header: 'Date',
+        header: 'Scanned Date',
         cell: ({ row }) =>
           format(new Date(row.original.created_at), 'MMM d, yyyy'),
       },

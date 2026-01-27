@@ -23,6 +23,7 @@ import { BatchDetailsPanel } from '../components/BatchDetailsPanel';
 
 interface BatchRow {
   id: number;
+  reference: string | null;
   file_name: string;
   status: string;
   page_count: number | null;
@@ -130,13 +131,25 @@ export function Batches() {
         enableSorting: false,
       },
       {
-        accessorKey: 'file_name',
-        header: 'Filename',
+        accessorKey: 'reference',
+        header: 'Reference',
         cell: ({ row }) => (
-          <span className="font-medium truncate max-w-xs block">
-            {row.original.file_name}
+          <span className="font-mono text-sm">
+            {row.original.reference ?? '-'}
           </span>
         ),
+      },
+      {
+        accessorKey: 'file_name',
+        header: 'Filename',
+        cell: ({ row }) => {
+          const displayName = row.original.file_name.replace(/^[a-f0-9]+_/, '');
+          return (
+            <span className="font-medium truncate max-w-xs block">
+              {displayName}
+            </span>
+          );
+        },
       },
       {
         accessorKey: 'store.store_number',
@@ -150,7 +163,7 @@ export function Batches() {
                 <AlertTriangle size={14} className="text-amber-500" />
               )}
               <span className={isUnassigned ? 'text-amber-600 font-medium' : ''}>
-                {isUnassigned ? 'UNASSIGNED' : `Store ${storeNum}`}
+                {storeNum}
               </span>
             </div>
           );
@@ -178,7 +191,7 @@ export function Batches() {
       },
       {
         accessorKey: 'created_at',
-        header: 'Date',
+        header: 'Scanned Date',
         cell: ({ row }) =>
           format(new Date(row.original.created_at), 'MMM d, yyyy h:mm a'),
       },
