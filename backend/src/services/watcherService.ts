@@ -179,13 +179,17 @@ async function processNewFile(filePath: string): Promise<void> {
 
     logger.info(`Created batch ${batch.id} for ${locationInfo?.displayName ?? 'UNASSIGNED'}`);
 
-    await archiveFile(filePath);
-
     setImmediate(() => {
       processBatch(batch.id).catch((err) => {
         logger.error(`Background processing failed for batch ${batch.id}:`, err);
       });
     });
+
+    try {
+      await archiveFile(filePath);
+    } catch (archiveError) {
+      logger.warn(`Failed to archive ${filename}, but batch ${batch.id} will still be processed:`, archiveError);
+    }
   } catch (error) {
     logger.error(`Error processing file ${filename}:`, error);
   } finally {
