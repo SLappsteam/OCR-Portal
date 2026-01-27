@@ -3,30 +3,61 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 const documentTypes = [
+  // Slumberland document types from coversheets
   {
-    code: 'INVOICE',
-    name: 'Invoice',
-    description: 'Vendor invoices and bills',
+    code: 'CDR',
+    name: 'CDR Paperwork',
+    description: 'Cash drawer reconciliation documents',
   },
   {
-    code: 'PO',
-    name: 'Purchase Order',
-    description: 'Purchase orders for inventory and supplies',
+    code: 'APINV',
+    name: 'AP Invoice',
+    description: 'Accounts payable invoices',
   },
   {
-    code: 'RECEIPT',
-    name: 'Receipt',
-    description: 'Customer receipts and transaction records',
+    code: 'ATOMRCV',
+    name: 'A to M Receiving',
+    description: 'Receiving paperwork for vendors A-M',
   },
   {
-    code: 'CONTRACT',
-    name: 'Contract',
-    description: 'Legal contracts and agreements',
+    code: 'MTOZRCV',
+    name: 'M to Z Receiving',
+    description: 'Receiving paperwork for vendors M-Z',
   },
   {
-    code: 'DELIVERY',
-    name: 'Delivery Ticket',
-    description: 'Delivery confirmation and shipping documents',
+    code: 'LBRCV',
+    name: 'La-Z-Boy Receiving',
+    description: 'La-Z-Boy receiving paperwork',
+  },
+  {
+    code: 'REFUND',
+    name: 'Cash/Check Refund Vouchers',
+    description: 'Refund voucher documents',
+  },
+  {
+    code: 'EXPENSE',
+    name: 'Expense Report',
+    description: 'Expense reports and reimbursements',
+  },
+  {
+    code: 'FINSALES',
+    name: 'Finalized Sales',
+    description: 'Finalized sales transactions',
+  },
+  {
+    code: 'FINTRAN',
+    name: 'Financing Transactions',
+    description: 'Customer financing transactions',
+  },
+  {
+    code: 'LOFTFIN',
+    name: 'Loft Financing',
+    description: 'Loft financing transactions',
+  },
+  {
+    code: 'WFDEP',
+    name: 'Wells Fargo Deposits',
+    description: 'Wells Fargo bank deposit slips',
   },
   {
     code: 'OTHER',

@@ -7,12 +7,14 @@ import {
   HybridBinarizer,
 } from '@zxing/library';
 import sharp from 'sharp';
+import Tesseract from 'tesseract.js';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/logger';
 
 const prisma = new PrismaClient();
 
 const CODE_39_WRAPPER = /^\*|\*$/g;
+const BARCODE_TEXT_PATTERN = /[*"]([A-Z0-9]+)[*"]/;
 
 function createReader(): MultiFormatReader {
   const hints = new Map();
@@ -39,22 +41,72 @@ async function imageBufferToLuminance(
   };
 }
 
-export async function detectBarcode(
+async function detectBarcodeWithZxing(
   imageBuffer: Buffer
 ): Promise<string | null> {
   try {
     const { data, width, height } = await imageBufferToLuminance(imageBuffer);
-
     const luminanceSource = new RGBLuminanceSource(data, width, height);
     const binaryBitmap = new BinaryBitmap(new HybridBinarizer(luminanceSource));
-
     const reader = createReader();
     const result = reader.decode(binaryBitmap);
-
     return result.getText();
   } catch {
     return null;
   }
+}
+
+async function detectBarcodeWithOCR(
+  imageBuffer: Buffer
+): Promise<string | null> {
+  try {
+    const metadata = await sharp(imageBuffer).metadata();
+    const width = metadata.width ?? 1700;
+    const height = metadata.height ?? 2200;
+
+    // Crop to barcode label region (upper portion where coversheet text is)
+    const cropTop = Math.floor(height * 0.35);
+    const cropHeight = Math.floor(height * 0.15);
+    const cropped = await sharp(imageBuffer)
+      .extract({ left: 0, top: cropTop, width, height: cropHeight })
+      .grayscale()
+      .normalize()
+      .png()
+      .toBuffer();
+
+    const result = await Tesseract.recognize(cropped, 'eng', {
+      logger: () => {},
+    });
+
+    const match = result.data.text.match(BARCODE_TEXT_PATTERN);
+    if (match?.[1]) {
+      logger.debug(`OCR detected barcode text: ${match[1]}`);
+      return match[1];
+    }
+    return null;
+  } catch (error) {
+    logger.debug('OCR barcode detection failed:', error);
+    return null;
+  }
+}
+
+export async function detectBarcode(
+  imageBuffer: Buffer
+): Promise<string | null> {
+  // Try zxing first
+  const zxingResult = await detectBarcodeWithZxing(imageBuffer);
+  if (zxingResult) {
+    logger.debug(`Zxing detected barcode: ${zxingResult}`);
+    return zxingResult;
+  }
+
+  // Fall back to OCR
+  const ocrResult = await detectBarcodeWithOCR(imageBuffer);
+  if (ocrResult) {
+    return `*${ocrResult}*`;
+  }
+
+  return null;
 }
 
 export function normalizeBarcode(raw: string): string {

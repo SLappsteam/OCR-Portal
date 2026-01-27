@@ -16,8 +16,10 @@ import {
   ChevronRight,
   RefreshCw,
   FileText,
+  AlertTriangle,
 } from 'lucide-react';
 import { fetchBatches, fetchStores, reprocessBatch } from '../api/client';
+import { BatchDetailsPanel } from '../components/BatchDetailsPanel';
 
 interface BatchRow {
   id: number;
@@ -49,9 +51,14 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+interface StoreData {
+  id: number;
+  store_number: string;
+}
+
 export function Batches() {
   const [batches, setBatches] = useState<BatchRow[]>([]);
-  const [stores, setStores] = useState<{ store_number: string }[]>([]);
+  const [stores, setStores] = useState<StoreData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -62,10 +69,14 @@ export function Batches() {
     status: '',
   });
 
-  useEffect(() => {
+  const loadStores = () => {
     fetchStores()
-      .then((data) => setStores(data as { store_number: string }[]))
+      .then((data) => setStores(data as StoreData[]))
       .catch(console.error);
+  };
+
+  useEffect(() => {
+    loadStores();
   }, []);
 
   const loadBatches = () => {
@@ -130,7 +141,20 @@ export function Batches() {
       {
         accessorKey: 'store.store_number',
         header: 'Store',
-        cell: ({ row }) => `Store ${row.original.store.store_number}`,
+        cell: ({ row }) => {
+          const storeNum = row.original.store.store_number;
+          const isUnassigned = storeNum === 'UNASSIGNED';
+          return (
+            <div className="flex items-center gap-1">
+              {isUnassigned && (
+                <AlertTriangle size={14} className="text-amber-500" />
+              )}
+              <span className={isUnassigned ? 'text-amber-600 font-medium' : ''}>
+                {isUnassigned ? 'UNASSIGNED' : `Store ${storeNum}`}
+              </span>
+            </div>
+          );
+        },
       },
       {
         accessorKey: 'status',
@@ -284,12 +308,22 @@ export function Batches() {
                       </td>
                     ))}
                   </tr>
-                  {expanded[row.id] && row.original.error_message && (
+                  {expanded[row.id] && (
                     <tr>
-                      <td colSpan={columns.length} className="px-4 py-3 bg-red-50">
-                        <div className="text-sm text-red-700">
-                          <strong>Error:</strong> {row.original.error_message}
-                        </div>
+                      <td colSpan={columns.length} className="p-0">
+                        {row.original.error_message && (
+                          <div className="px-8 py-3 bg-red-50 text-sm text-red-700">
+                            <strong>Error:</strong> {row.original.error_message}
+                          </div>
+                        )}
+                        <BatchDetailsPanel
+                          batchId={row.original.id}
+                          stores={stores}
+                          onStoreChanged={() => {
+                            loadBatches();
+                            loadStores();
+                          }}
+                        />
                       </td>
                     </tr>
                   )}

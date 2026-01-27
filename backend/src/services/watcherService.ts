@@ -1,12 +1,13 @@
 import chokidar, { FSWatcher } from 'chokidar';
 import path from 'path';
 import { stat } from 'fs/promises';
-import { fileTypeFromFile } from 'file-type';
+import sharp from 'sharp';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/logger';
 import { calculateFileHash, parseStoreNumber } from '../utils/fileUtils';
 import { storeFile, archiveFile } from './storageService';
 import { processBatch } from './batchProcessor';
+import { setWatcherStatus } from '../routes/settings';
 
 const prisma = new PrismaClient();
 
@@ -16,8 +17,8 @@ const processingFiles = new Set<string>();
 
 async function isValidTiff(filePath: string): Promise<boolean> {
   try {
-    const type = await fileTypeFromFile(filePath);
-    return type?.mime === 'image/tiff';
+    const metadata = await sharp(filePath).metadata();
+    return metadata.format === 'tiff';
   } catch {
     return false;
   }
@@ -48,6 +49,8 @@ async function getOrCreateStore(storeNumber: string): Promise<number> {
   return store.id;
 }
 
+const UNASSIGNED_STORE = 'UNASSIGNED';
+
 async function processNewFile(filePath: string): Promise<void> {
   const filename = path.basename(filePath);
 
@@ -65,10 +68,11 @@ async function processNewFile(filePath: string): Promise<void> {
       return;
     }
 
-    const storeNumber = parseStoreNumber(filename);
-    if (!storeNumber) {
-      logger.warn(`Cannot parse store number from: ${filename}`);
-      return;
+    const parsedStore = parseStoreNumber(filename);
+    const storeNumber = parsedStore ?? UNASSIGNED_STORE;
+
+    if (!parsedStore) {
+      logger.warn(`Cannot parse store number from: ${filename}, using UNASSIGNED`);
     }
 
     const fileHash = await calculateFileHash(filePath);
@@ -138,6 +142,7 @@ export function startWatcher(watchPath: string): void {
 
   watcher.on('ready', () => {
     logger.info('File watcher ready and monitoring for new TIFFs');
+    setWatcherStatus(true);
   });
 }
 
@@ -145,6 +150,7 @@ export function stopWatcher(): void {
   if (watcher) {
     watcher.close();
     watcher = null;
+    setWatcherStatus(false);
     logger.info('File watcher stopped');
   }
 }

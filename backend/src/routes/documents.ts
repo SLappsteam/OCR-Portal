@@ -8,6 +8,14 @@ import { logger } from '../utils/logger';
 const router = Router();
 const prisma = new PrismaClient();
 
+function serializeDocument(doc: Record<string, unknown>): Record<string, unknown> {
+  return JSON.parse(
+    JSON.stringify(doc, (_key, value) =>
+      typeof value === 'bigint' ? Number(value) : value
+    )
+  );
+}
+
 const querySchema = z.object({
   storeNumber: z.string().optional(),
   documentType: z.string().optional(),
@@ -49,7 +57,10 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       orderBy: { created_at: 'desc' },
     });
 
-    const response: ApiResponse = { success: true, data: documents };
+    const serialized = documents.map((d) =>
+      serializeDocument(d as unknown as Record<string, unknown>)
+    );
+    const response: ApiResponse = { success: true, data: serialized };
     res.json(response);
   } catch (error) {
     next(error);
@@ -75,7 +86,10 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       throw new NotFoundError('Document not found');
     }
 
-    const response: ApiResponse = { success: true, data: document };
+    const response: ApiResponse = {
+      success: true,
+      data: serializeDocument(document as unknown as Record<string, unknown>),
+    };
     res.json(response);
   } catch (error) {
     next(error);
@@ -114,7 +128,10 @@ router.patch(
       });
 
       logger.info(`Document ${id} updated`);
-      const response: ApiResponse = { success: true, data: updated };
+      const response: ApiResponse = {
+        success: true,
+        data: serializeDocument(updated as unknown as Record<string, unknown>),
+      };
       res.json(response);
     } catch (error) {
       next(error);

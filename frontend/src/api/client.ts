@@ -175,6 +175,27 @@ export async function reprocessBatch(id: number) {
   return response;
 }
 
+export async function updateBatchStore(batchId: number, storeId: number) {
+  const response = await apiClient.patch<ApiResponse<unknown>>(
+    `/api/batches/${batchId}`,
+    { storeId }
+  );
+  if (!response.success) {
+    throw new Error(response.error ?? 'Failed to update batch store');
+  }
+  return response.data;
+}
+
+export async function fetchBatchDocuments(batchId: number) {
+  const response = await apiClient.get<ApiResponse<unknown>>(
+    `/api/batches/${batchId}`
+  );
+  if (!response.success || !response.data) {
+    throw new Error(response.error ?? 'Failed to fetch batch documents');
+  }
+  return response.data;
+}
+
 export async function fetchStores() {
   const response = await apiClient.get<ApiResponse<unknown[]>>('/api/stores');
   if (!response.success) {
