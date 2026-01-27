@@ -107,11 +107,11 @@ export function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-lg shadow">
           <div className="p-4 border-b">
-            <h2 className="font-semibold">Documents by Type</h2>
+            <h2 className="font-semibold">Batches by Type</h2>
           </div>
           <div className="p-4">
             {stats.documentsByType.length === 0 ? (
-              <p className="text-gray-500 text-sm">No documents yet</p>
+              <p className="text-gray-500 text-sm">No batches yet</p>
             ) : (
               <div className="space-y-3">
                 {stats.documentsByType.map((item) => (

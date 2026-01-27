@@ -7,6 +7,7 @@ import previewRouter from './preview';
 import storesRouter from './stores';
 import documentTypesRouter from './documentTypes';
 import statsRouter from './stats';
+import settingsRouter from './settings';
 
 const router = Router();
 
@@ -18,5 +19,6 @@ router.use('/api/preview', previewRouter);
 router.use('/api/stores', storesRouter);
 router.use('/api/document-types', documentTypesRouter);
 router.use('/api/stats', statsRouter);
+router.use('/api/settings', settingsRouter);
 
 export { router as routes };

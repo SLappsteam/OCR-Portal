@@ -70,35 +70,24 @@ async function getOrCreateUnassigned(): Promise<number> {
 }
 
 const UNASSIGNED_STORE = 'UNASSIGNED';
+const REFERENCE_START = 100001;
 
-function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0];
-}
-
-async function generateReference(filename: string): Promise<string> {
-  const baseName = filename.replace(/\.(tif|tiff)$/i, '');
-  const scanDate = formatDate(new Date());
-  const baseRef = `${baseName}_${scanDate}`;
-
-  const existing = await prisma.batch.findFirst({
-    where: { reference: baseRef },
-  });
-
-  if (!existing) {
-    return baseRef;
-  }
-
-  const duplicates = await prisma.batch.findMany({
-    where: { reference: { startsWith: baseRef } },
+async function generateReference(locationCode: string): Promise<string> {
+  const lastBatch = await prisma.batch.findFirst({
+    where: {
+      reference: { startsWith: locationCode },
+    },
+    orderBy: { reference: 'desc' },
     select: { reference: true },
   });
 
-  const maxSuffix = duplicates.reduce((max, b) => {
-    const match = b.reference.match(/-(\d+)$/);
-    return match ? Math.max(max, parseInt(match[1], 10)) : max;
-  }, 1);
+  if (!lastBatch?.reference) {
+    return `${locationCode}${REFERENCE_START}`;
+  }
 
-  return `${baseRef}-${maxSuffix + 1}`;
+  const lastNumber = parseInt(lastBatch.reference.slice(locationCode.length), 10);
+  const nextNumber = lastNumber + 1;
+  return `${locationCode}${nextNumber}`;
 }
 
 async function processNewFile(filePath: string): Promise<void> {
@@ -141,7 +130,7 @@ async function processNewFile(filePath: string): Promise<void> {
       ? await getOrCreateLocation(locationInfo)
       : await getOrCreateUnassigned();
 
-    const reference = await generateReference(filename);
+    const reference = await generateReference(storageFolder);
 
     const batch = await prisma.batch.create({
       data: {

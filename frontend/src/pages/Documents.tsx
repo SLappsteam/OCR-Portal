@@ -9,7 +9,7 @@ import {
   type ColumnDef,
 } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { ChevronUp, ChevronDown, Eye } from 'lucide-react';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 import {
   fetchDocuments,
   fetchStores,
@@ -19,6 +19,7 @@ import {
 
 interface DocumentRow {
   id: number;
+  reference: string | null;
   page_start: number;
   page_end: number;
   created_at: string;
@@ -98,9 +99,13 @@ export function Documents() {
         },
       },
       {
-        id: 'order_number',
-        header: 'Order #',
-        cell: () => <span className="text-gray-400">-</span>,
+        accessorKey: 'reference',
+        header: 'Reference',
+        cell: ({ row }) => (
+          <span className="font-mono text-sm">
+            {row.original.reference ?? '-'}
+          </span>
+        ),
       },
       {
         id: 'customer_name',
@@ -121,18 +126,13 @@ export function Documents() {
       {
         id: 'actions',
         header: '',
-        cell: ({ row }) => (
-          <button
-            onClick={() => navigate(`/documents/${row.original.id}`)}
-            className="p-2 text-primary-600 hover:bg-primary-50 rounded"
-          >
-            <Eye size={18} />
-          </button>
+        cell: () => (
+          <span className="text-gray-300">›</span>
         ),
         enableSorting: false,
       },
     ],
-    [navigate]
+    []
   );
 
   const table = useReactTable({

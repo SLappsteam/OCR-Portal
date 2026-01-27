@@ -5,6 +5,7 @@ import { Documents } from './pages/Documents';
 import { DocumentViewer } from './pages/DocumentViewer';
 import { Batches } from './pages/Batches';
 import { Stores } from './pages/Stores';
+import { Settings } from './pages/Settings';
 
 function App() {
   return (
@@ -16,21 +17,10 @@ function App() {
           <Route path="/documents/:id" element={<DocumentViewer />} />
           <Route path="/batches" element={<Batches />} />
           <Route path="/stores" element={<Stores />} />
-          <Route path="/settings" element={<SettingsPlaceholder />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </Layout>
     </BrowserRouter>
-  );
-}
-
-function SettingsPlaceholder() {
-  return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-      <div className="bg-white rounded-lg shadow p-6">
-        <p className="text-gray-500">Settings page coming soon.</p>
-      </div>
-    </div>
   );
 }
 

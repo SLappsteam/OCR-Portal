@@ -17,6 +17,7 @@ import {
 
 interface DocumentData {
   id: number;
+  reference: string | null;
   page_start: number;
   page_end: number;
   status: string;
@@ -93,7 +94,9 @@ export function DocumentViewer() {
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-xl font-bold">Document #{document.id}</h1>
+        <h1 className="text-xl font-bold font-mono">
+          {document.reference ?? `Document #${document.id}`}
+        </h1>
       </div>
 
       <div className="flex-1 flex gap-4 min-h-0">
@@ -130,6 +133,13 @@ export function DocumentViewer() {
           <h2 className="font-semibold mb-4">Document Details</h2>
 
           <div className="space-y-4 text-sm">
+            <div>
+              <label className="text-gray-500">Reference</label>
+              <p className="font-medium font-mono">
+                {document.reference ?? '-'}
+              </p>
+            </div>
+
             <div>
               <label className="text-gray-500">Store</label>
               <p className="font-medium">

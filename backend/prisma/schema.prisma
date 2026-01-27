@@ -40,6 +40,7 @@ model Store {
 model Batch {
   id              Int        @id @default(autoincrement())
   store_id        Int
+  reference       String?    @unique
   file_name       String
   file_path       String
   file_size_bytes BigInt?
@@ -64,6 +65,7 @@ model Batch {
 model Document {
   id               Int           @id @default(autoincrement())
   batch_id         Int
+  reference        String?       @unique
   document_type_id Int?
   page_start       Int
   page_end         Int

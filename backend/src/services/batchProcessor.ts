@@ -24,6 +24,8 @@ async function updateBatchStatus(
 
 async function createDocumentRecord(
   batchId: number,
+  batchReference: string | null,
+  documentNumber: number,
   boundary: {
     documentTypeCode: string;
     startPage: number;
@@ -31,10 +33,12 @@ async function createDocumentRecord(
   }
 ): Promise<void> {
   const docType = await getDocumentTypeByCode(boundary.documentTypeCode);
+  const reference = batchReference ? `${batchReference}_${documentNumber}` : null;
 
   await prisma.document.create({
     data: {
       batch_id: batchId,
+      reference,
       document_type_id: docType?.id ?? null,
       page_start: boundary.startPage,
       page_end: boundary.endPage,
@@ -63,8 +67,11 @@ export async function processBatch(batchId: number): Promise<void> {
 
     const boundaries = await analyzeTiff(batch.file_path);
 
-    for (const boundary of boundaries) {
-      await createDocumentRecord(batchId, boundary);
+    for (let i = 0; i < boundaries.length; i++) {
+      const boundary = boundaries[i];
+      if (boundary) {
+        await createDocumentRecord(batchId, batch.reference, i + 1, boundary);
+      }
     }
 
     await prisma.batch.update({

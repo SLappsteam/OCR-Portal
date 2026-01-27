@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Fragment } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   useReactTable,
   getCoreRowModel,
@@ -17,6 +18,7 @@ import {
   RefreshCw,
   FileText,
   AlertTriangle,
+  Eye,
 } from 'lucide-react';
 import { fetchBatches, fetchStores, reprocessBatch } from '../api/client';
 import { BatchDetailsPanel } from '../components/BatchDetailsPanel';
@@ -58,6 +60,7 @@ interface StoreData {
 }
 
 export function Batches() {
+  const navigate = useNavigate();
   const [batches, setBatches] = useState<BatchRow[]>([]);
   const [stores, setStores] = useState<StoreData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -217,8 +220,25 @@ export function Batches() {
           ),
         enableSorting: false,
       },
+      {
+        id: 'preview',
+        header: '',
+        cell: ({ row }) => (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/batches/${row.original.id}`);
+            }}
+            className="p-2 text-primary-600 hover:bg-primary-50 rounded"
+            title="Preview batch"
+          >
+            <Eye size={18} />
+          </button>
+        ),
+        enableSorting: false,
+      },
     ],
-    [expanded, reprocessing]
+    [expanded, reprocessing, navigate]
   );
 
   const table = useReactTable({
