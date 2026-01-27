@@ -98,8 +98,20 @@ async function createBatchWithRetry(
   fileHash: string,
   storedPath: string,
   fileSize: number
-): Promise<{ id: number }> {
+): Promise<{ id: number } | null> {
+  const hashPrefix = fileHash.substring(0, 16);
+
   for (let attempt = 0; attempt < MAX_REFERENCE_RETRIES; attempt++) {
+    // Check for duplicate right before creation to handle race conditions
+    const existingBatch = await prisma.batch.findFirst({
+      where: { file_name: { startsWith: hashPrefix } },
+      select: { id: true },
+    });
+    if (existingBatch) {
+      logger.warn(`Duplicate detected for ${filename} (hash: ${hashPrefix}), batch ${existingBatch.id} already exists`);
+      return null;
+    }
+
     const reference = await generateReference(storageFolder);
 
     try {
@@ -107,7 +119,7 @@ async function createBatchWithRetry(
         data: {
           store_id: storeId,
           reference,
-          file_name: `${fileHash.substring(0, 16)}_${filename}`,
+          file_name: `${hashPrefix}_${filename}`,
           file_path: storedPath,
           file_size_bytes: fileSize,
           status: 'pending',
@@ -176,6 +188,16 @@ async function processNewFile(filePath: string): Promise<void> {
       storedPath,
       fileStats.size
     );
+
+    if (!batch) {
+      // Duplicate detected during batch creation - just archive the file
+      try {
+        await archiveFile(filePath);
+      } catch {
+        // Ignore archive errors for duplicates
+      }
+      return;
+    }
 
     logger.info(`Created batch ${batch.id} for ${locationInfo?.displayName ?? 'UNASSIGNED'}`);
 
