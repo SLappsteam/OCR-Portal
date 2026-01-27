@@ -3,7 +3,13 @@ import { createReadStream } from 'fs';
 import { mkdir, stat } from 'fs/promises';
 import { logger } from './logger';
 
-const STORE_NUMBER_PATTERN = /ST(\d{2})/i;
+export interface LocationInfo {
+  type: 'store' | 'dc';
+  identifier: string;
+  displayName: string;
+}
+
+const LOCATION_PATTERN = /^(ST|DC)([A-Z0-9]{1,2})/i;
 
 export async function calculateFileHash(filePath: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -31,12 +37,25 @@ export async function ensureDirectory(dirPath: string): Promise<void> {
   }
 }
 
-export function parseStoreNumber(filename: string): string | null {
-  const match = filename.match(STORE_NUMBER_PATTERN);
-  if (!match?.[1]) {
+export function parseLocationInfo(filename: string): LocationInfo | null {
+  const match = filename.match(LOCATION_PATTERN);
+  if (!match?.[1] || !match?.[2]) {
     return null;
   }
-  return match[1];
+
+  const typeCode = match[1].toUpperCase();
+  const identifier = match[2].toUpperCase();
+
+  const type = typeCode === 'DC' ? 'dc' : 'store';
+  const displayName = type === 'dc' ? `DC ${identifier}` : identifier;
+
+  return { type, identifier, displayName };
+}
+
+// Deprecated: use parseLocationInfo instead
+export function parseStoreNumber(filename: string): string | null {
+  const info = parseLocationInfo(filename);
+  return info ? `${info.type === 'dc' ? 'DC' : 'ST'}${info.identifier}` : null;
 }
 
 export async function getFileSize(filePath: string): Promise<number> {

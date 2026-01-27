@@ -14,7 +14,8 @@ import { logger } from '../utils/logger';
 const prisma = new PrismaClient();
 
 const CODE_39_WRAPPER = /^\*|\*$/g;
-const BARCODE_TEXT_PATTERN = /[*"]([A-Z0-9]+)[*"]/;
+// Pattern handles OCR errors: * can be misread as ~, ), *, ", etc.
+const BARCODE_TEXT_PATTERN = /[*"'+]([A-Z0-9]{2,10})[*"'~)\]|]/;
 
 function createReader(): MultiFormatReader {
   const hints = new Map();

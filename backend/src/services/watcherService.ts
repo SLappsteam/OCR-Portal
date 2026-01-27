@@ -4,7 +4,7 @@ import { stat } from 'fs/promises';
 import sharp from 'sharp';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/logger';
-import { calculateFileHash, parseStoreNumber } from '../utils/fileUtils';
+import { calculateFileHash, parseLocationInfo, LocationInfo } from '../utils/fileUtils';
 import { storeFile, archiveFile } from './storageService';
 import { processBatch } from './batchProcessor';
 import { setWatcherStatus } from '../routes/settings';
@@ -31,7 +31,9 @@ async function isDuplicateFile(fileHash: string): Promise<boolean> {
   return existing !== null;
 }
 
-async function getOrCreateStore(storeNumber: string): Promise<number> {
+async function getOrCreateLocation(locationInfo: LocationInfo): Promise<number> {
+  const storeNumber = `${locationInfo.type === 'dc' ? 'DC' : 'ST'}${locationInfo.identifier}`;
+
   let store = await prisma.store.findUnique({
     where: { store_number: storeNumber },
   });
@@ -40,16 +42,64 @@ async function getOrCreateStore(storeNumber: string): Promise<number> {
     store = await prisma.store.create({
       data: {
         store_number: storeNumber,
-        name: `Store ${storeNumber}`,
+        name: locationInfo.displayName,
       },
     });
-    logger.info(`Created new store: ${storeNumber}`);
+    logger.info(`Created new location: ${locationInfo.displayName}`);
+  }
+
+  return store.id;
+}
+
+async function getOrCreateUnassigned(): Promise<number> {
+  let store = await prisma.store.findUnique({
+    where: { store_number: UNASSIGNED_STORE },
+  });
+
+  if (!store) {
+    store = await prisma.store.create({
+      data: {
+        store_number: UNASSIGNED_STORE,
+        name: 'Unassigned',
+      },
+    });
+    logger.info('Created UNASSIGNED location');
   }
 
   return store.id;
 }
 
 const UNASSIGNED_STORE = 'UNASSIGNED';
+
+function formatDate(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
+async function generateReference(filename: string): Promise<string> {
+  const baseName = filename.replace(/\.(tif|tiff)$/i, '');
+  const scanDate = formatDate(new Date());
+  const baseRef = `${baseName}_${scanDate}`;
+
+  const existing = await prisma.batch.findFirst({
+    where: { reference: baseRef },
+  });
+
+  if (!existing) {
+    return baseRef;
+  }
+
+  const duplicates = await prisma.batch.findMany({
+    where: { reference: { startsWith: baseRef } },
+    select: { reference: true },
+  });
+
+  const maxSuffix = duplicates.reduce((max, b) => {
+    const match = b.reference.match(/-(\d+)$/);
+    return match ? Math.max(max, parseInt(match[1], 10)) : max;
+  }, 1);
+
+  return `${baseRef}-${maxSuffix + 1}`;
+}
 
 async function processNewFile(filePath: string): Promise<void> {
   const filename = path.basename(filePath);
@@ -68,11 +118,10 @@ async function processNewFile(filePath: string): Promise<void> {
       return;
     }
 
-    const parsedStore = parseStoreNumber(filename);
-    const storeNumber = parsedStore ?? UNASSIGNED_STORE;
+    const locationInfo = parseLocationInfo(filename);
 
-    if (!parsedStore) {
-      logger.warn(`Cannot parse store number from: ${filename}, using UNASSIGNED`);
+    if (!locationInfo) {
+      logger.warn(`Cannot parse location from: ${filename}, using UNASSIGNED`);
     }
 
     const fileHash = await calculateFileHash(filePath);
@@ -82,13 +131,22 @@ async function processNewFile(filePath: string): Promise<void> {
       return;
     }
 
+    const storageFolder = locationInfo
+      ? `${locationInfo.type === 'dc' ? 'DC' : 'ST'}${locationInfo.identifier}`
+      : UNASSIGNED_STORE;
+
     const fileStats = await stat(filePath);
-    const storedPath = await storeFile(filePath, storeNumber);
-    const storeId = await getOrCreateStore(storeNumber);
+    const storedPath = await storeFile(filePath, storageFolder);
+    const storeId = locationInfo
+      ? await getOrCreateLocation(locationInfo)
+      : await getOrCreateUnassigned();
+
+    const reference = await generateReference(filename);
 
     const batch = await prisma.batch.create({
       data: {
         store_id: storeId,
+        reference,
         file_name: `${fileHash.substring(0, 16)}_${filename}`,
         file_path: storedPath,
         file_size_bytes: fileStats.size,
@@ -96,7 +154,7 @@ async function processNewFile(filePath: string): Promise<void> {
       },
     });
 
-    logger.info(`Created batch ${batch.id} for store ${storeNumber}`);
+    logger.info(`Created batch ${batch.id} for ${locationInfo?.displayName ?? 'UNASSIGNED'}`);
 
     await archiveFile(filePath);
 
