@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model DocumentType {
+  id          Int        @id @default(autoincrement())
+  code        String     @unique
+  name        String
+  description String?
+  is_active   Boolean    @default(true)
+  created_at  DateTime   @default(now())
+  updated_at  DateTime   @updatedAt
+  documents   Document[]
+
+  @@map("document_types")
+}
+
+model Store {
+  id               Int               @id @default(autoincrement())
+  store_number     String            @unique
+  name             String
+  address          String?
+  city             String?
+  state            String?
+  zip_code         String?
+  is_active        Boolean           @default(true)
+  created_at       DateTime          @default(now())
+  updated_at       DateTime          @updatedAt
+  batches          Batch[]
+  userStoreAccess  UserStoreAccess[]
+
+  @@map("stores")
+}
+
+model Batch {
+  id              Int        @id @default(autoincrement())
+  store_id        Int
+  file_name       String
+  file_path       String
+  file_size_bytes BigInt?
+  page_count      Int?
+  status          String     @default("pending")
+  error_message   String?
+  uploaded_by     Int?
+  uploaded_at     DateTime   @default(now())
+  processed_at    DateTime?
+  created_at      DateTime   @default(now())
+  updated_at      DateTime   @updatedAt
+  store           Store      @relation(fields: [store_id], references: [id])
+  uploadedByUser  User?      @relation(fields: [uploaded_by], references: [id])
+  documents       Document[]
+
+  @@index([store_id])
+  @@index([status])
+  @@index([uploaded_at])
+  @@map("batches")
+}
+
+model Document {
+  id               Int           @id @default(autoincrement())
+  batch_id         Int
+  document_type_id Int?
+  page_start       Int
+  page_end         Int
+  extracted_text   String?
+  confidence_score Float?
+  metadata         String?
+  status           String        @default("pending")
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @updatedAt
+  batch            Batch         @relation(fields: [batch_id], references: [id], onDelete: Cascade)
+  documentType     DocumentType? @relation(fields: [document_type_id], references: [id])
+
+  @@index([batch_id])
+  @@index([document_type_id])
+  @@index([status])
+  @@map("documents")
+}
+
+model User {
+  id               Int               @id @default(autoincrement())
+  email            String            @unique
+  password_hash    String
+  first_name       String
+  last_name        String
+  role             String            @default("viewer")
+  is_active        Boolean           @default(true)
+  last_login_at    DateTime?
+  created_at       DateTime          @default(now())
+  updated_at       DateTime          @updatedAt
+  batches          Batch[]
+  storeAccess      UserStoreAccess[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model UserStoreAccess {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  store_id   Int
+  can_view   Boolean  @default(true)
+  can_upload Boolean  @default(false)
+  can_edit   Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  store      Store    @relation(fields: [store_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, store_id])
+  @@index([user_id])
+  @@index([store_id])
+  @@map("user_store_access")
+}
