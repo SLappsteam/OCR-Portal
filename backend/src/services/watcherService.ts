@@ -26,8 +26,8 @@ async function isValidTiff(filePath: string): Promise<boolean> {
 }
 
 async function isDuplicateFile(fileHash: string): Promise<boolean> {
-  const existing = await prisma.batch.findFirst({
-    where: { file_name: { contains: fileHash.substring(0, 16) } },
+  const existing = await prisma.batch.findUnique({
+    where: { file_hash: fileHash },
   });
   return existing !== null;
 }
@@ -99,19 +99,7 @@ async function createBatchWithRetry(
   storedPath: string,
   fileSize: number
 ): Promise<{ id: number } | null> {
-  const hashPrefix = fileHash.substring(0, 16);
-
   for (let attempt = 0; attempt < MAX_REFERENCE_RETRIES; attempt++) {
-    // Check for duplicate right before creation to handle race conditions
-    const existingBatch = await prisma.batch.findFirst({
-      where: { file_name: { startsWith: hashPrefix } },
-      select: { id: true },
-    });
-    if (existingBatch) {
-      logger.warn(`Duplicate detected for ${filename} (hash: ${hashPrefix}), batch ${existingBatch.id} already exists`);
-      return null;
-    }
-
     const reference = await generateReference(storageFolder);
 
     try {
@@ -119,7 +107,8 @@ async function createBatchWithRetry(
         data: {
           store_id: storeId,
           reference,
-          file_name: `${hashPrefix}_${filename}`,
+          file_hash: fileHash,
+          file_name: filename,
           file_path: storedPath,
           file_size_bytes: fileSize,
           status: 'pending',
@@ -130,6 +119,11 @@ async function createBatchWithRetry(
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
+        const target = error.meta?.['target'] as string[] | undefined;
+        if (target?.includes('file_hash')) {
+          logger.warn(`Duplicate file detected for ${filename} (hash: ${fileHash.substring(0, 16)})`);
+          return null;
+        }
         logger.warn(`Reference collision on ${reference}, retrying (${attempt + 1}/${MAX_REFERENCE_RETRIES})...`);
         continue;
       }

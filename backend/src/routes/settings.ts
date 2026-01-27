@@ -1,8 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import path from 'path';
+import { PrismaClient } from '@prisma/client';
 import { ApiResponse } from '../types';
+import { logger } from '../utils/logger';
 
 const router = Router();
+const prisma = new PrismaClient();
 
 interface SettingsResponse {
   watchFolderPath: string;
@@ -33,6 +36,29 @@ router.get('/', (_req: Request, res: Response, next: NextFunction) => {
     const response: ApiResponse<SettingsResponse> = {
       success: true,
       data: settings,
+    };
+
+    res.json(response);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/clear-data', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const deletedDocs = await prisma.document.deleteMany({});
+    const deletedBatches = await prisma.batch.deleteMany({});
+    const deletedStores = await prisma.store.deleteMany({});
+
+    logger.info(`Cleared data: ${deletedDocs.count} documents, ${deletedBatches.count} batches, ${deletedStores.count} stores`);
+
+    const response: ApiResponse<{ documents: number; batches: number; stores: number }> = {
+      success: true,
+      data: {
+        documents: deletedDocs.count,
+        batches: deletedBatches.count,
+        stores: deletedStores.count,
+      },
     };
 
     res.json(response);

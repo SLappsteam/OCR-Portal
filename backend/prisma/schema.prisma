@@ -41,6 +41,7 @@ model Batch {
   id              Int        @id @default(autoincrement())
   store_id        Int
   reference       String?    @unique
+  file_hash       String     @unique
   file_name       String
   file_path       String
   file_size_bytes BigInt?

@@ -84,6 +84,11 @@ export async function processBatch(batchId: number): Promise<void> {
       },
     });
 
+    await prisma.document.updateMany({
+      where: { batch_id: batchId },
+      data: { status: 'completed' },
+    });
+
     await updateBatchStatus(batchId, 'completed');
     logger.info(`Batch ${batchId} completed: ${boundaries.length} documents`);
   } catch (error) {
