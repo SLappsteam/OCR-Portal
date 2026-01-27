@@ -33,21 +33,30 @@ export async function storeFile(
 }
 
 export async function archiveFile(sourcePath: string): Promise<void> {
-  if (!ARCHIVE_FOLDER_PATH) {
-    await unlink(sourcePath);
-    logger.info(`Deleted source file: ${sourcePath}`);
-    return;
-  }
-
   const filename = path.basename(sourcePath);
-  const yearMonth = getYearMonth();
-  const archiveDir = path.join(ARCHIVE_FOLDER_PATH, yearMonth);
-  const archivePath = path.join(archiveDir, filename);
 
-  await mkdir(archiveDir, { recursive: true });
-  await rename(sourcePath, archivePath);
+  try {
+    if (!ARCHIVE_FOLDER_PATH) {
+      await unlink(sourcePath);
+      logger.info(`Deleted source file: ${sourcePath}`);
+      return;
+    }
 
-  logger.info(`Archived file: ${sourcePath} -> ${archivePath}`);
+    const yearMonth = getYearMonth();
+    const archiveDir = path.join(ARCHIVE_FOLDER_PATH, yearMonth);
+    const archivePath = path.join(archiveDir, filename);
+
+    await mkdir(archiveDir, { recursive: true });
+    await rename(sourcePath, archivePath);
+
+    logger.info(`Archived file: ${sourcePath} -> ${archivePath}`);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      logger.info(`Source file already removed: ${filename}`);
+      return;
+    }
+    throw error;
+  }
 }
 
 export async function ensureStorageDirectories(): Promise<void> {
