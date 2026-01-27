@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import {
@@ -7,6 +7,9 @@ import {
   ArrowLeft,
   Edit,
   Building,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
 } from 'lucide-react';
 import {
   fetchDocument,
@@ -40,10 +43,47 @@ export function DocumentViewer() {
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const totalPages = document
     ? document.page_end - document.page_start + 1
     : 0;
+
+  const changePage = (newPage: number) => {
+    setCurrentPage(newPage);
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setZoom((z) => Math.max(0.25, Math.min(3, z + delta)));
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoom <= 1) return;
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const resetView = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -104,7 +144,7 @@ export function DocumentViewer() {
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
             <button
               key={page}
-              onClick={() => setCurrentPage(page)}
+              onClick={() => changePage(page)}
               className={`w-full mb-2 p-1 rounded border-2 transition-colors ${
                 currentPage === page
                   ? 'border-primary-500'
@@ -121,12 +161,55 @@ export function DocumentViewer() {
           ))}
         </div>
 
-        <div className="flex-1 bg-white rounded-lg shadow p-4 flex items-center justify-center overflow-hidden">
-          <img
-            src={getPreviewUrl(document.id, currentPage)}
-            alt={`Page ${currentPage}`}
-            className="max-w-full max-h-full object-contain"
-          />
+        <div className="flex-1 bg-white rounded-lg shadow flex flex-col overflow-hidden">
+          <div className="flex items-center gap-2 p-2 border-b bg-gray-50">
+            <button
+              onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))}
+              className="p-1.5 hover:bg-gray-200 rounded"
+              title="Zoom out"
+            >
+              <ZoomOut size={18} />
+            </button>
+            <span className="text-sm w-16 text-center">{Math.round(zoom * 100)}%</span>
+            <button
+              onClick={() => setZoom((z) => Math.min(3, z + 0.25))}
+              className="p-1.5 hover:bg-gray-200 rounded"
+              title="Zoom in"
+            >
+              <ZoomIn size={18} />
+            </button>
+            <button
+              onClick={resetView}
+              className="p-1.5 hover:bg-gray-200 rounded"
+              title="Reset zoom"
+            >
+              <RotateCcw size={18} />
+            </button>
+            {zoom > 1 && (
+              <span className="text-xs text-gray-500 ml-2">Drag to pan</span>
+            )}
+          </div>
+          <div
+            ref={containerRef}
+            className="flex-1 overflow-hidden flex items-center justify-center"
+            style={{ cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
+            onWheel={handleWheel}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          >
+            <img
+              src={getPreviewUrl(document.id, currentPage)}
+              alt={`Page ${currentPage}`}
+              style={{
+                transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                transformOrigin: 'center center',
+              }}
+              className="max-w-full max-h-full object-contain select-none"
+              draggable={false}
+            />
+          </div>
         </div>
 
         <div className="w-72 bg-white rounded-lg shadow p-4 overflow-y-auto">
@@ -237,7 +320,7 @@ export function DocumentViewer() {
 
       <div className="mt-4 flex items-center justify-center gap-4 bg-white rounded-lg shadow p-3">
         <button
-          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+          onClick={() => changePage(Math.max(1, currentPage - 1))}
           disabled={currentPage === 1}
           className="p-2 hover:bg-gray-100 rounded disabled:opacity-50"
         >
@@ -253,7 +336,7 @@ export function DocumentViewer() {
             onChange={(e) => {
               const val = parseInt(e.target.value, 10);
               if (val >= 1 && val <= totalPages) {
-                setCurrentPage(val);
+                changePage(val);
               }
             }}
             className="w-12 text-center border rounded px-1 py-0.5"
@@ -261,7 +344,7 @@ export function DocumentViewer() {
           of {totalPages}
         </span>
         <button
-          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+          onClick={() => changePage(Math.min(totalPages, currentPage + 1))}
           disabled={currentPage === totalPages}
           className="p-2 hover:bg-gray-100 rounded disabled:opacity-50"
         >
