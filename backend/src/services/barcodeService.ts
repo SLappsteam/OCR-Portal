@@ -1,11 +1,3 @@
-import {
-  BarcodeFormat,
-  DecodeHintType,
-  MultiFormatReader,
-  RGBLuminanceSource,
-  BinaryBitmap,
-  HybridBinarizer,
-} from '@zxing/library';
 import sharp from 'sharp';
 import Tesseract from 'tesseract.js';
 import { PrismaClient } from '@prisma/client';
@@ -19,20 +11,28 @@ const OCR_NOISE_CHARS = /[^A-Z0-9]/g;
 // Content allows OCR noise chars (?, !, .) that get stripped during cleanup.
 const BARCODE_TEXT_PATTERN = /[*"'+]([A-Z0-9][A-Z0-9?!.,;: ]{1,11})[*"'~?)\]|]/;
 
-function createReader(): MultiFormatReader {
-  const hints = new Map();
-  hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.CODE_39]);
-  hints.set(DecodeHintType.TRY_HARDER, true);
+let scanImageData: typeof import('@undecaf/zbar-wasm').scanImageData;
 
-  const reader = new MultiFormatReader();
-  reader.setHints(hints);
-  return reader;
+async function getZbarScanner() {
+  if (!scanImageData) {
+    const zbar = await import('@undecaf/zbar-wasm');
+    scanImageData = zbar.scanImageData;
+  }
+  return scanImageData;
 }
 
-async function imageBufferToLuminance(
+async function cropForBarcode(
   imageBuffer: Buffer
 ): Promise<{ data: Uint8ClampedArray; width: number; height: number }> {
+  const metadata = await sharp(imageBuffer).metadata();
+  const width = metadata.width ?? 1700;
+  const height = metadata.height ?? 2200;
+
+  const cropTop = Math.floor(height * 0.35);
+  const cropHeight = Math.floor(height * 0.15);
+
   const { data, info } = await sharp(imageBuffer)
+    .extract({ left: 0, top: cropTop, width, height: cropHeight })
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
@@ -44,16 +44,18 @@ async function imageBufferToLuminance(
   };
 }
 
-async function detectBarcodeWithZxing(
+async function detectBarcodeWithZbar(
   imageBuffer: Buffer
 ): Promise<string | null> {
   try {
-    const { data, width, height } = await imageBufferToLuminance(imageBuffer);
-    const luminanceSource = new RGBLuminanceSource(data, width, height);
-    const binaryBitmap = new BinaryBitmap(new HybridBinarizer(luminanceSource));
-    const reader = createReader();
-    const result = reader.decode(binaryBitmap);
-    return result.getText();
+    const scan = await getZbarScanner();
+    const { data, width, height } = await cropForBarcode(imageBuffer);
+    const results = await scan({ data, width, height } as any);
+    const first = results[0];
+    if (first) {
+      return first.decode();
+    }
+    return null;
   } catch {
     return null;
   }
@@ -101,17 +103,30 @@ async function detectBarcodeWithOCR(
 export async function detectBarcode(
   imageBuffer: Buffer
 ): Promise<string | null> {
-  // Use OCR as primary method (more reliable for scanned documents)
+  // Fast path: zbar on both orientations (~40ms total)
+  const zbarResult = await detectBarcodeWithZbar(imageBuffer);
+  if (zbarResult) {
+    logger.info(`  Zbar detected barcode: ${zbarResult}`);
+    return `*${zbarResult}*`;
+  }
+
+  const rotated = await sharp(imageBuffer).rotate(180).png().toBuffer();
+  const zbarRotated = await detectBarcodeWithZbar(rotated);
+  if (zbarRotated) {
+    logger.info(`  Zbar detected barcode (180°): ${zbarRotated}`);
+    return `*${zbarRotated}*`;
+  }
+
+  // Slow path: OCR on both orientations (~2-4s)
   const ocrResult = await detectBarcodeWithOCR(imageBuffer);
   if (ocrResult) {
     return `*${ocrResult}*`;
   }
 
-  // Fall back to zxing for clean digital barcodes
-  const zxingResult = await detectBarcodeWithZxing(imageBuffer);
-  if (zxingResult) {
-    logger.info(`  Zxing detected barcode: ${zxingResult}`);
-    return zxingResult;
+  const ocrRotated = await detectBarcodeWithOCR(rotated);
+  if (ocrRotated) {
+    logger.info(`  OCR barcode found on 180° rotation`);
+    return `*${ocrRotated}*`;
   }
 
   return null;

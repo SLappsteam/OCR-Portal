@@ -1,4 +1,3 @@
-import sharp from 'sharp';
 import { getTiffPageCount, extractPageAsPng } from './tiffService';
 import {
   detectBarcode,
@@ -21,16 +20,7 @@ async function scanPageForBarcode(
   pageNumber: number
 ): Promise<string | null> {
   const pageBuffer = await extractPageAsPng(filePath, pageNumber);
-  const result = await detectBarcode(pageBuffer);
-  if (result) return result;
-
-  // Retry with 180° rotation for upside-down pages
-  const rotated = await sharp(pageBuffer).rotate(180).png().toBuffer();
-  const rotatedResult = await detectBarcode(rotated);
-  if (rotatedResult) {
-    logger.info(`  Page ${pageNumber}: barcode found after 180° retry`);
-  }
-  return rotatedResult;
+  return detectBarcode(pageBuffer);
 }
 
 async function validateDocumentType(code: string): Promise<string | null> {
