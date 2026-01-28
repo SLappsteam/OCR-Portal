@@ -14,8 +14,10 @@ import { logger } from '../utils/logger';
 const prisma = new PrismaClient();
 
 const CODE_39_WRAPPER = /^\*|\*$/g;
+const OCR_NOISE_CHARS = /[^A-Z0-9]/g;
 // Pattern handles OCR errors: * can be misread as ~, ), *, ", etc.
-const BARCODE_TEXT_PATTERN = /[*"'+]([A-Z0-9]{2,10})[*"'~)\]|]/;
+// Content allows OCR noise chars (?, !, .) that get stripped during cleanup.
+const BARCODE_TEXT_PATTERN = /[*"'+]([A-Z0-9][A-Z0-9?!.,;: ]{1,11})[*"'~?)\]|]/;
 
 function createReader(): MultiFormatReader {
   const hints = new Map();
@@ -81,8 +83,11 @@ async function detectBarcodeWithOCR(
 
     const match = result.data.text.match(BARCODE_TEXT_PATTERN);
     if (match?.[1]) {
-      logger.debug(`OCR detected barcode text: ${match[1]}`);
-      return match[1];
+      const cleaned = match[1].replace(OCR_NOISE_CHARS, '');
+      if (cleaned.length >= 2) {
+        logger.debug(`OCR detected barcode text: ${match[1]} -> ${cleaned}`);
+        return cleaned;
+      }
     }
     return null;
   } catch (error) {
