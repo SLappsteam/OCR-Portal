@@ -1,3 +1,4 @@
+import sharp from 'sharp';
 import { getTiffPageCount, extractPageAsPng } from './tiffService';
 import {
   detectBarcode,
@@ -20,14 +21,19 @@ async function scanPageForBarcode(
   pageNumber: number
 ): Promise<string | null> {
   const pageBuffer = await extractPageAsPng(filePath, pageNumber);
-  return detectBarcode(pageBuffer);
+  const result = await detectBarcode(pageBuffer);
+  if (result) return result;
+
+  // Retry with 180° rotation for upside-down pages
+  const rotated = await sharp(pageBuffer).rotate(180).png().toBuffer();
+  return detectBarcode(rotated);
 }
 
-async function validateDocumentType(code: string): Promise<string> {
+async function validateDocumentType(code: string): Promise<string | null> {
   const isValid = await isValidDocumentType(code);
   if (!isValid) {
-    logger.warn(`Unknown document type code: ${code}, using UNCLASSIFIED`);
-    return UNCLASSIFIED_CODE;
+    logger.debug(`Ignoring unknown barcode code: ${code}`);
+    return null;
   }
   return code;
 }
@@ -61,19 +67,21 @@ export async function analyzeTiff(
       const normalizedCode = normalizeBarcode(rawBarcode);
       const validatedCode = await validateDocumentType(normalizedCode);
 
-      const finalized = finalizeDocument(currentDocument, page - 1);
-      if (finalized) {
-        boundaries.push(finalized);
+      if (validatedCode) {
+        const finalized = finalizeDocument(currentDocument, page - 1);
+        if (finalized) {
+          boundaries.push(finalized);
+        }
+
+        currentDocument = {
+          documentTypeCode: validatedCode,
+          startPage: page,
+          endPage: page,
+          barcodeRaw: rawBarcode,
+        };
+
+        logger.debug(`Page ${page}: Found barcode ${normalizedCode}`);
       }
-
-      currentDocument = {
-        documentTypeCode: validatedCode,
-        startPage: page,
-        endPage: page,
-        barcodeRaw: rawBarcode,
-      };
-
-      logger.debug(`Page ${page}: Found barcode ${normalizedCode}`);
     } else if (page === 0 && !currentDocument) {
       currentDocument = {
         documentTypeCode: UNCLASSIFIED_CODE,

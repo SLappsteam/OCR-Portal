@@ -224,7 +224,7 @@ export function startWatcher(watchPath: string): void {
   watcher = chokidar.watch(watchPath, {
     ignored: /(^|[\/\\])\../,
     persistent: true,
-    ignoreInitial: true,
+    ignoreInitial: false,
     awaitWriteFinish: {
       stabilityThreshold: DEBOUNCE_MS,
       pollInterval: 100,

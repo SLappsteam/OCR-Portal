@@ -32,11 +32,9 @@ export async function extractPageAsPng(
       );
     }
 
-    const buffer = await sharp(filePath, { page: pageNumber })
+    return sharp(filePath, { page: pageNumber })
       .png()
       .toBuffer();
-
-    return buffer;
   } catch (error) {
     logger.error(
       `Error extracting page ${pageNumber} from ${filePath}:`,
