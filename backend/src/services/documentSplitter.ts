@@ -26,13 +26,17 @@ async function scanPageForBarcode(
 
   // Retry with 180° rotation for upside-down pages
   const rotated = await sharp(pageBuffer).rotate(180).png().toBuffer();
-  return detectBarcode(rotated);
+  const rotatedResult = await detectBarcode(rotated);
+  if (rotatedResult) {
+    logger.info(`  Page ${pageNumber}: barcode found after 180° retry`);
+  }
+  return rotatedResult;
 }
 
 async function validateDocumentType(code: string): Promise<string | null> {
   const isValid = await isValidDocumentType(code);
   if (!isValid) {
-    logger.debug(`Ignoring unknown barcode code: ${code}`);
+    logger.info(`  Ignoring unrecognized barcode code: "${code}"`);
     return null;
   }
   return code;
@@ -71,6 +75,7 @@ export async function analyzeTiff(
         const finalized = finalizeDocument(currentDocument, page - 1);
         if (finalized) {
           boundaries.push(finalized);
+          logger.info(`  Closed ${finalized.documentTypeCode} (pages ${finalized.startPage}-${finalized.endPage})`);
         }
 
         currentDocument = {
@@ -80,7 +85,9 @@ export async function analyzeTiff(
           barcodeRaw: rawBarcode,
         };
 
-        logger.debug(`Page ${page}: Found barcode ${normalizedCode}`);
+        logger.info(`  Page ${page}: coversheet detected -> ${validatedCode}`);
+      } else {
+        logger.info(`  Page ${page}: barcode read "${normalizedCode}" but not a valid doc type`);
       }
     } else if (page === 0 && !currentDocument) {
       currentDocument = {
@@ -89,15 +96,21 @@ export async function analyzeTiff(
         endPage: 0,
         barcodeRaw: '',
       };
-      logger.debug('Page 0: No barcode, starting UNCLASSIFIED document');
+      logger.info('  Page 0: no barcode found, starting as UNCLASSIFIED');
+    } else {
+      logger.info(`  Page ${page}: no barcode (continuation)`);
     }
   }
 
   const finalDoc = finalizeDocument(currentDocument, pageCount - 1);
   if (finalDoc) {
     boundaries.push(finalDoc);
+    logger.info(`  Closed ${finalDoc.documentTypeCode} (pages ${finalDoc.startPage}-${finalDoc.endPage})`);
   }
 
-  logger.info(`Found ${boundaries.length} documents in TIFF`);
+  const summary = boundaries
+    .map((b) => `${b.documentTypeCode}[${b.startPage}-${b.endPage}]`)
+    .join(', ');
+  logger.info(`Split result: ${boundaries.length} documents -> ${summary}`);
   return boundaries;
 }

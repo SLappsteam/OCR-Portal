@@ -143,7 +143,7 @@ async function processNewFile(filePath: string): Promise<void> {
   processingFiles.add(filePath);
 
   try {
-    logger.info(`Processing new file: ${filename}`);
+    logger.info(`Incoming file: ${filename}`);
 
     const isValid = await isValidTiff(filePath);
     if (!isValid) {
@@ -154,12 +154,17 @@ async function processNewFile(filePath: string): Promise<void> {
     const locationInfo = parseLocationInfo(filename);
 
     if (!locationInfo) {
-      logger.warn(`Cannot parse location from: ${filename}, using UNASSIGNED`);
+      logger.warn(`Cannot parse location from: ${filename}, assigning to UNASSIGNED`);
     }
 
+    const fileStats = await stat(filePath);
+    const sizeMB = (fileStats.size / (1024 * 1024)).toFixed(2);
+
     const fileHash = await calculateFileHash(filePath);
+    logger.info(`  File: ${filename}, size=${sizeMB}MB, hash=${fileHash.substring(0, 12)}, location=${locationInfo?.displayName ?? 'UNASSIGNED'}`);
+
     if (await isDuplicateFile(fileHash)) {
-      logger.warn(`Duplicate file detected, skipping: ${filename}`);
+      logger.warn(`  Duplicate file detected, skipping: ${filename} (hash=${fileHash.substring(0, 12)})`);
       await archiveFile(filePath);
       return;
     }
@@ -168,7 +173,6 @@ async function processNewFile(filePath: string): Promise<void> {
       ? `${locationInfo.type === 'dc' ? 'DC' : 'ST'}${locationInfo.identifier}`
       : UNASSIGNED_STORE;
 
-    const fileStats = await stat(filePath);
     const storedPath = await storeFile(filePath, storageFolder);
     const storeId = locationInfo
       ? await getOrCreateLocation(locationInfo)
@@ -193,7 +197,7 @@ async function processNewFile(filePath: string): Promise<void> {
       return;
     }
 
-    logger.info(`Created batch ${batch.id} for ${locationInfo?.displayName ?? 'UNASSIGNED'}`);
+    logger.info(`  Created batch ${batch.id} (ref=${storageFolder}) for ${locationInfo?.displayName ?? 'UNASSIGNED'}`);
 
     setImmediate(() => {
       processBatch(batch.id).catch((err) => {

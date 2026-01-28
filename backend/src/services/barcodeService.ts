@@ -81,17 +81,19 @@ async function detectBarcodeWithOCR(
       logger: () => {},
     });
 
-    const match = result.data.text.match(BARCODE_TEXT_PATTERN);
+    const rawText = result.data.text.trim();
+    const match = rawText.match(BARCODE_TEXT_PATTERN);
     if (match?.[1]) {
       const cleaned = match[1].replace(OCR_NOISE_CHARS, '');
       if (cleaned.length >= 2) {
-        logger.debug(`OCR detected barcode text: ${match[1]} -> ${cleaned}`);
+        logger.info(`  OCR barcode match: raw="${match[0]}" -> cleaned="${cleaned}"`);
         return cleaned;
       }
+      logger.info(`  OCR matched "${match[0]}" but cleaned too short: "${cleaned}"`);
     }
     return null;
   } catch (error) {
-    logger.debug('OCR barcode detection failed:', error);
+    logger.warn('OCR barcode detection failed:', error);
     return null;
   }
 }
@@ -108,7 +110,7 @@ export async function detectBarcode(
   // Fall back to zxing for clean digital barcodes
   const zxingResult = await detectBarcodeWithZxing(imageBuffer);
   if (zxingResult) {
-    logger.debug(`Zxing detected barcode: ${zxingResult}`);
+    logger.info(`  Zxing detected barcode: ${zxingResult}`);
     return zxingResult;
   }
 

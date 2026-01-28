@@ -43,10 +43,14 @@ async function createDocumentRecord(
     },
   });
 
+  const reference = `${storeNumber}-${doc.id}`;
   await prisma.document.update({
     where: { id: doc.id },
-    data: { reference: `${storeNumber}-${doc.id}` },
+    data: { reference },
   });
+
+  const pageCount = boundary.endPage - boundary.startPage + 1;
+  logger.info(`  Created document ${reference}: type=${boundary.documentTypeCode}, pages ${boundary.startPage}-${boundary.endPage} (${pageCount} pages)`);
 }
 
 export async function processBatch(batchId: number): Promise<void> {
@@ -67,8 +71,11 @@ export async function processBatch(batchId: number): Promise<void> {
     throw new Error(`Batch ${batchId} is already being processed`);
   }
 
+  const startTime = Date.now();
+
   try {
     await updateBatchStatus(batchId, 'processing');
+    logger.info(`Batch ${batchId}: store=${storeNumber}, file=${batch.file_name}`);
 
     const boundaries = await analyzeTiff(batch.file_path);
 
@@ -78,14 +85,14 @@ export async function processBatch(batchId: number): Promise<void> {
       }
     }
 
+    const totalPages = boundaries.reduce(
+      (sum, b) => sum + (b.endPage - b.startPage + 1),
+      0
+    );
+
     await prisma.batch.update({
       where: { id: batchId },
-      data: {
-        page_count: boundaries.reduce(
-          (sum, b) => sum + (b.endPage - b.startPage + 1),
-          0
-        ),
-      },
+      data: { page_count: totalPages },
     });
 
     await prisma.document.updateMany({
@@ -94,10 +101,12 @@ export async function processBatch(batchId: number): Promise<void> {
     });
 
     await updateBatchStatus(batchId, 'completed');
-    logger.info(`Batch ${batchId} completed: ${boundaries.length} documents`);
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    logger.info(`Batch ${batchId} completed: ${boundaries.length} documents, ${totalPages} pages in ${elapsed}s`);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    logger.error(`Batch ${batchId} failed:`, error);
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    logger.error(`Batch ${batchId} failed after ${elapsed}s:`, error);
     await updateBatchStatus(batchId, 'failed', message);
     throw error;
   }
