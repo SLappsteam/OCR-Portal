@@ -48,16 +48,14 @@ router.post('/clear-data', async (_req: Request, res: Response, next: NextFuncti
   try {
     const deletedDocs = await prisma.document.deleteMany({});
     const deletedBatches = await prisma.batch.deleteMany({});
-    const deletedStores = await prisma.store.deleteMany({});
 
-    logger.info(`Cleared data: ${deletedDocs.count} documents, ${deletedBatches.count} batches, ${deletedStores.count} stores`);
+    logger.info(`Cleared data: ${deletedDocs.count} documents, ${deletedBatches.count} batches (stores preserved)`);
 
-    const response: ApiResponse<{ documents: number; batches: number; stores: number }> = {
+    const response: ApiResponse<{ documents: number; batches: number }> = {
       success: true,
       data: {
         documents: deletedDocs.count,
         batches: deletedBatches.count,
-        stores: deletedStores.count,
       },
     };
 

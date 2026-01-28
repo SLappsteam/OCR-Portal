@@ -56,24 +56,24 @@ export function Stores() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Stores</h1>
+        <h1 className="text-xl font-semibold text-gray-900">Stores</h1>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 text-sm"
         >
-          <Plus size={18} />
+          <Plus size={16} />
           Add Store
         </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center text-gray-500">Loading...</div>
         ) : stores.length === 0 ? (
           <div className="p-8 text-center text-gray-500">No stores found</div>
         ) : (
           <table className="w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
                   Store
@@ -95,7 +95,7 @@ export function Stores() {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-gray-100">
               {stores.map((store) => (
                 <tr key={store.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
@@ -107,10 +107,14 @@ export function Stores() {
                     </div>
                   </td>
                   <td className="px-4 py-3">{store.name}</td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {store.city && store.state
-                      ? `${store.city}, ${store.state}`
-                      : '-'}
+                  <td className="px-4 py-3 text-gray-600 max-w-xs truncate" title={store.address || ''}>
+                    {store.address
+                      ? store.city && store.state
+                        ? `${store.address}, ${store.city}, ${store.state}`
+                        : store.address
+                      : store.city && store.state
+                        ? `${store.city}, ${store.state}`
+                        : '-'}
                   </td>
                   <td className="px-4 py-3">{store._count.batches}</td>
                   <td className="px-4 py-3">
@@ -135,9 +139,9 @@ export function Stores() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-lg font-semibold mb-4">Add New Store</h2>
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-lg">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Add New Store</h2>
 
             {error && (
               <div className="mb-4 p-3 bg-red-50 text-red-700 rounded text-sm">
@@ -156,7 +160,7 @@ export function Stores() {
                   onChange={(e) =>
                     setNewStore((s) => ({ ...s, storeNumber: e.target.value }))
                   }
-                  className="w-full border rounded px-3 py-2"
+                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
                   placeholder="e.g., 54"
                 />
               </div>
@@ -171,7 +175,7 @@ export function Stores() {
                   onChange={(e) =>
                     setNewStore((s) => ({ ...s, name: e.target.value }))
                   }
-                  className="w-full border rounded px-3 py-2"
+                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
                   placeholder="e.g., Store 54 - Minneapolis"
                 />
               </div>
@@ -183,14 +187,14 @@ export function Stores() {
                   setShowModal(false);
                   setError(null);
                 }}
-                className="px-4 py-2 border rounded hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-200 rounded hover:bg-gray-50 text-sm"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreate}
                 disabled={!newStore.storeNumber}
-                className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50"
+                className="px-4 py-2 bg-gray-900 text-white rounded hover:bg-gray-800 disabled:opacity-50 text-sm"
               >
                 Create Store
               </button>
