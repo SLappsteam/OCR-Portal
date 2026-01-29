@@ -64,12 +64,14 @@ export function DocumentViewer() {
     return map;
   }, [extractions]);
 
-  const currentPageFields = useMemo(() => {
+  const currentExtraction = useMemo(() => {
     if (!document) return null;
     const absolutePage = document.page_start + currentPage - 1;
-    const ext = extractionMap.get(absolutePage);
-    return ext?.fields ?? null;
+    return extractionMap.get(absolutePage) ?? null;
   }, [document, currentPage, extractionMap]);
+
+  const currentPageFields = currentExtraction?.fields ?? null;
+  const currentPageConfidence = currentExtraction?.confidence ?? null;
 
   const changePage = (newPage: number) => {
     setCurrentPage(newPage);
@@ -252,6 +254,7 @@ export function DocumentViewer() {
           onStoreChange={setSelectedStoreId}
           onStoreSave={handleSaveStore}
           pageFields={currentPageFields}
+          pageConfidence={currentPageConfidence}
           currentPage={currentPage}
         />
       </div>

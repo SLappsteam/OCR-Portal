@@ -100,6 +100,42 @@ async function detectBarcodeWithOCR(
   }
 }
 
+export async function scanBarcodeInRegion(
+  imageBuffer: Buffer,
+  topPct: number,
+  heightPct: number
+): Promise<string | null> {
+  try {
+    const scan = await getZbarScanner();
+    const metadata = await sharp(imageBuffer).metadata();
+    const width = metadata.width ?? 1700;
+    const height = metadata.height ?? 2200;
+
+    const cropTop = Math.floor(height * topPct);
+    const cropHeight = Math.min(
+      Math.floor(height * heightPct),
+      height - cropTop
+    );
+
+    const { data, info } = await sharp(imageBuffer)
+      .extract({ left: 0, top: cropTop, width, height: cropHeight })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    const results = await scan({
+      data: new Uint8ClampedArray(data),
+      width: info.width,
+      height: info.height,
+    } as any);
+
+    const first = results[0];
+    return first ? first.decode() : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function detectBarcode(
   imageBuffer: Buffer
 ): Promise<string | null> {

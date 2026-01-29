@@ -4,10 +4,13 @@ import { extractPageAsPng } from '../tiffService';
 import { correctPageImage } from '../imageCorrection';
 import { parseFinsalesText, calculateConfidence } from './finsalesParser';
 import { parseSummaryText, isSummaryPage } from './summaryParser';
+import { isTicketPage, parseTicketText, calculateTicketConfidence } from './ticketParser';
+import { scanBarcodeInRegion } from '../barcodeService';
 import { PageExtractionResult } from './types';
 import { logger } from '../../utils/logger';
 
 const SUPPORTED_DOC_TYPES = ['FINSALES'];
+const LOW_CONFIDENCE_THRESHOLD = 20;
 
 export async function extractAllPages(
   filePath: string,
@@ -49,7 +52,27 @@ export async function extractSinglePage(
     }
 
     const corrected = await correctPageImage(pageBuffer);
-    return await extractDetailPage(corrected, pageNumber, docTypeCode);
+    let { text: rawText, confidence: ocrConf } = await ocrPageWithConfidence(corrected);
+    let activeBuffer = corrected;
+
+    if (ocrConf < LOW_CONFIDENCE_THRESHOLD) {
+      const flipped = await sharp(corrected).rotate(180).png().toBuffer();
+      const flippedResult = await ocrPageWithConfidence(flipped);
+      if (flippedResult.confidence > ocrConf + 10) {
+        logger.info(
+          `Page ${pageNumber}: low OCR confidence (${ocrConf.toFixed(0)}%), ` +
+          `retrying 180° (${flippedResult.confidence.toFixed(0)}%)`
+        );
+        activeBuffer = flipped;
+        rawText = flippedResult.text;
+      }
+    }
+
+    if (isTicketPage(rawText)) {
+      return await tryExtractTicket(activeBuffer, rawText, pageNumber, docTypeCode);
+    }
+
+    return buildDetailResult(rawText, pageNumber, docTypeCode);
   } catch (error) {
     logger.error(`Page extraction failed for ${docTypeCode} page ${pageNumber}:`, error);
     return null;
@@ -88,12 +111,11 @@ async function tryExtractSummary(
   };
 }
 
-async function extractDetailPage(
-  imageBuffer: Buffer,
+function buildDetailResult(
+  rawText: string,
   pageNumber: number,
   docTypeCode: string
-): Promise<PageExtractionResult> {
-  const rawText = await ocrPage(imageBuffer);
+): PageExtractionResult {
   const fields = parseFinsalesText(rawText);
   const confidence = calculateConfidence(fields);
 
@@ -111,9 +133,47 @@ async function extractDetailPage(
   };
 }
 
+async function tryExtractTicket(
+  pageBuffer: Buffer,
+  rawText: string,
+  pageNumber: number,
+  docTypeCode: string
+): Promise<PageExtractionResult> {
+  const fields = parseTicketText(rawText);
+
+  const barcode = await scanBarcodeInRegion(pageBuffer, 0.65, 0.35);
+  if (barcode) {
+    fields.order_id = barcode;
+  }
+
+  const confidence = calculateTicketConfidence(fields);
+
+  logger.info(
+    `Extracted ${fields.ticket_type} ticket ${docTypeCode} page ${pageNumber}: ` +
+    `order=${fields.order_id}, customer=${fields.customer_name} (barcode=${barcode ?? 'none'})`
+  );
+
+  return {
+    page_number: pageNumber,
+    document_type: docTypeCode,
+    fields,
+    confidence,
+    raw_text: rawText,
+  };
+}
+
 async function ocrPage(imageBuffer: Buffer): Promise<string> {
   const result = await Tesseract.recognize(imageBuffer, 'eng', {
     logger: () => {},
   });
   return result.data.text;
+}
+
+async function ocrPageWithConfidence(
+  imageBuffer: Buffer
+): Promise<{ text: string; confidence: number }> {
+  const result = await Tesseract.recognize(imageBuffer, 'eng', {
+    logger: () => {},
+  });
+  return { text: result.data.text, confidence: result.data.confidence };
 }

@@ -2,6 +2,7 @@ import { FinsalesData } from './types';
 
 export function parseFinsalesText(rawText: string): FinsalesData {
   return {
+    ticket_type: null,
     order_id: extractOrderId(rawText),
     customer_name: extractCustomerName(rawText),
     customer_id: null,
@@ -16,9 +17,13 @@ export function parseFinsalesText(rawText: string): FinsalesData {
 }
 
 function extractOrderId(text: string): string | null {
-  const match = text.match(/NUMBER\s*:\s*(\S+)/i)
-    ?? text.match(/Order\s*#?\s*:?\s*(\d\S+)/i);
-  return match?.[1]?.trim() ?? null;
+  // Primary: "NUMBER : 0302569NP45" on header line
+  const numberMatch = text.match(/NUMBER\s*:\s*(\d\S+)/i);
+  if (numberMatch?.[1]) return numberMatch[1].trim();
+
+  // Fallback: "Order #: 12345" but NOT "ORDER TYPE:"
+  const orderMatch = text.match(/Order\s*#\s*:?\s*(\d\S+)/i);
+  return orderMatch?.[1]?.trim() ?? null;
 }
 
 const STREET_SUFFIX =
@@ -33,14 +38,16 @@ function extractCustomerName(text: string): string | null {
   const match = text.match(primary);
   if (match?.[1]) return match[1].trim();
 
-  // Fallback: grab name-like segment before ORDER TYPE
-  const fallback = text.match(/\n\s*(.+?)\s+ORDER\s+TYPE/i);
-  if (fallback?.[1]) {
-    const parts = fallback[1].replace(/\d[\d\s-]+/, '').trim();
-    const nameMatch = parts.match(
+  // Fallback: line containing "ORDER TYPE:" — name is between address and ORDER TYPE
+  const lines = text.split('\n');
+  for (const line of lines) {
+    if (!/ORDER\s+TYPE/i.test(line)) continue;
+    const before = line.split(/ORDER\s+TYPE/i)[0] ?? '';
+    // Extract last name-like segment (2+ uppercase words)
+    const nameMatch = before.match(
       /([A-Z][A-Za-z/]+(?:\s+[A-Z][A-Za-z/]+)+)\s*$/
     );
-    return nameMatch?.[1]?.trim() ?? null;
+    if (nameMatch?.[1]) return nameMatch[1].trim();
   }
   return null;
 }
@@ -97,9 +104,7 @@ function extractSalesperson(text: string): string | null {
 }
 
 function extractTotal(text: string): string | null {
-  const match = text.match(/Subtotal:?\s*\$?\s*([\d,.]+)/i)
-    ?? text.match(/Gross\s*Sales?:?\s*\$?\s*([\d,.]+)/i)
-    ?? text.match(/Total\s*:?\s*\$?\s*([\d,.]+)/i);
+  const match = text.match(/Gross\s*Sales?:?\s*\$?\s*([\d,.]+)/i);
   return match?.[1]?.trim() ?? null;
 }
 

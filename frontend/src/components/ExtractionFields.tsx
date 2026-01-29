@@ -6,6 +6,7 @@ interface ExtractionFieldsProps {
 
 const FIELD_LABELS: Record<string, string> = {
   document_type: 'Document Type',
+  ticket_type: 'Ticket Type',
   order_id: 'Order ID',
   customer_name: 'Customer Name',
   customer_id: 'Customer ID',

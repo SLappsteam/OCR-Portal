@@ -35,6 +35,7 @@ interface DocumentDetailSidebarProps {
   onStoreChange: (id: number) => void;
   onStoreSave: () => void;
   pageFields: FinsalesFields | null;
+  pageConfidence: number | null;
   currentPage: number;
 }
 
@@ -55,6 +56,7 @@ export function DocumentDetailSidebar({
   onStoreChange,
   onStoreSave,
   pageFields,
+  pageConfidence,
   currentPage,
 }: DocumentDetailSidebarProps) {
   const totalPages = document.page_end - document.page_start + 1;
@@ -177,8 +179,19 @@ export function DocumentDetailSidebar({
         <hr className="my-4" />
 
         <div>
-          <h3 className="font-semibold text-gray-700 mb-2">
+          <h3 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
             Extracted Data (Page {currentPage})
+            {pageConfidence !== null && (
+              <span className={`text-xs font-normal px-1.5 py-0.5 rounded ${
+                pageConfidence >= 0.7
+                  ? 'bg-green-100 text-green-700'
+                  : pageConfidence >= 0.4
+                    ? 'bg-yellow-100 text-yellow-700'
+                    : 'bg-red-100 text-red-700'
+              }`}>
+                {Math.round(pageConfidence * 100)}%
+              </span>
+            )}
           </h3>
           {pageFields ? (
             <ExtractionFields fields={pageFields} />

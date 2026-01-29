@@ -1,4 +1,5 @@
 export interface FinsalesData {
+  ticket_type: string | null;
   order_id: string | null;
   customer_name: string | null;
   customer_id: string | null;
