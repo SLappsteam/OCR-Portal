@@ -69,19 +69,27 @@ async function extractAndStorePageData(
       boundary.documentTypeCode
     );
 
-    if (pages.length === 0) return;
+    const coversheetRow = {
+      document_id: docId,
+      page_number: boundary.startPage,
+      fields: { document_type: boundary.documentTypeCode } as unknown as Prisma.JsonObject,
+      raw_text: '',
+      confidence: 1.0,
+    };
+
+    const contentRows = pages.map((p) => ({
+      document_id: docId,
+      page_number: p.page_number,
+      fields: p.fields as unknown as Prisma.JsonObject,
+      raw_text: p.raw_text,
+      confidence: p.confidence,
+    }));
 
     await prisma.pageExtraction.createMany({
-      data: pages.map((p) => ({
-        document_id: docId,
-        page_number: p.page_number,
-        fields: p.fields as unknown as Prisma.JsonObject,
-        raw_text: p.raw_text,
-        confidence: p.confidence,
-      })),
+      data: [coversheetRow, ...contentRows],
     });
 
-    logger.info(`Stored ${pages.length} page extractions for doc ${docId}`);
+    logger.info(`Stored ${contentRows.length + 1} page extractions for doc ${docId} (1 coversheet + ${contentRows.length} content)`);
   } catch (error) {
     logger.error(`Page extraction failed for doc ${docId}:`, error);
   }

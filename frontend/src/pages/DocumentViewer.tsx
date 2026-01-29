@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft,
@@ -11,11 +11,14 @@ import {
 import {
   fetchDocument,
   fetchDocumentTypes,
+  fetchStores,
   updateDocument,
+  updateBatchStore,
   getPreviewUrl,
   fetchDocumentExtractions,
 } from '../api/client';
 import { DocumentDetailSidebar } from '../components/DocumentDetailSidebar';
+import { useZoomPan } from '../hooks/useZoomPan';
 import type { PageExtractionRecord } from '../types/extraction';
 
 interface DocumentData {
@@ -43,13 +46,12 @@ export function DocumentViewer() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [stores, setStores] = useState<{ id: number; store_number: string; name: string }[]>([]);
+  const [isEditingType, setIsEditingType] = useState(false);
+  const [isEditingStore, setIsEditingStore] = useState(false);
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
+  const { zoom, setZoom, pan, isDragging, handleWheel, handleMouseDown, handleMouseMove, handleMouseUp, resetView } = useZoomPan();
 
   const totalPages = document ? document.page_end - document.page_start + 1 : 0;
 
@@ -70,32 +72,7 @@ export function DocumentViewer() {
 
   const changePage = (newPage: number) => {
     setCurrentPage(newPage);
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  };
-
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    setZoom((z) => Math.max(0.25, Math.min(3, z + delta)));
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (zoom <= 1) return;
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
-  };
-
-  const handleMouseUp = () => setIsDragging(false);
-
-  const resetView = () => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
+    resetView();
   };
 
   useEffect(() => {
@@ -107,12 +84,19 @@ export function DocumentViewer() {
       fetchDocument(docId),
       fetchDocumentTypes(),
       fetchDocumentExtractions(docId),
+      fetchStores(),
     ])
-      .then(([docData, types, exts]) => {
+      .then(([docData, types, exts, storesData]) => {
         const doc = docData as DocumentData;
+        const storesList = storesData as { id: number; store_number: string; name: string }[];
         setDocument(doc);
         setDocTypes(types as { id: number; name: string }[]);
+        setStores(storesList);
         setSelectedTypeId(doc.documentType?.id ?? null);
+        const currentStore = storesList.find(
+          (s) => s.store_number === doc.batch.store.store_number
+        );
+        setSelectedStoreId(currentStore?.id ?? null);
         setExtractions(exts);
 
         const pageParam = searchParams.get('page');
@@ -135,7 +119,19 @@ export function DocumentViewer() {
       await updateDocument(document.id, { documentTypeId: selectedTypeId });
       const updated = await fetchDocument(document.id);
       setDocument(updated as DocumentData);
-      setIsEditing(false);
+      setIsEditingType(false);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const handleSaveStore = async () => {
+    if (!document || selectedStoreId === null) return;
+    try {
+      await updateBatchStore(document.batch.id, selectedStoreId);
+      const updated = await fetchDocument(document.id);
+      setDocument(updated as DocumentData);
+      setIsEditingStore(false);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -209,7 +205,6 @@ export function DocumentViewer() {
             {zoom > 1 && <span className="text-xs text-gray-500 ml-2">Drag to pan</span>}
           </div>
           <div
-            ref={containerRef}
             className="flex-1 overflow-hidden flex items-center justify-center"
             style={{ cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
             onWheel={handleWheel}
@@ -234,12 +229,19 @@ export function DocumentViewer() {
         <DocumentDetailSidebar
           document={document}
           docTypes={docTypes}
-          isEditing={isEditing}
+          stores={stores}
+          isEditingType={isEditingType}
+          isEditingStore={isEditingStore}
           selectedTypeId={selectedTypeId}
-          onEditStart={() => setIsEditing(true)}
-          onEditCancel={() => setIsEditing(false)}
+          selectedStoreId={selectedStoreId}
+          onTypeEditStart={() => setIsEditingType(true)}
+          onTypeEditCancel={() => setIsEditingType(false)}
           onTypeChange={setSelectedTypeId}
-          onSave={handleSaveType}
+          onTypeSave={handleSaveType}
+          onStoreEditStart={() => setIsEditingStore(true)}
+          onStoreEditCancel={() => setIsEditingStore(false)}
+          onStoreChange={setSelectedStoreId}
+          onStoreSave={handleSaveStore}
           pageFields={currentPageFields}
           currentPage={currentPage}
         />

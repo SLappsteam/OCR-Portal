@@ -5,6 +5,7 @@ interface ExtractionFieldsProps {
 }
 
 const FIELD_LABELS: Record<keyof FinsalesFields, string> = {
+  document_type: 'Document Type',
   order_id: 'Order ID',
   customer_name: 'Customer Name',
   customer_id: 'Customer ID',

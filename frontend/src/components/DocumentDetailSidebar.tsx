@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { Edit, Building } from 'lucide-react';
+import { Edit } from 'lucide-react';
 import { ExtractionFields } from './ExtractionFields';
 import type { FinsalesFields } from '../types/extraction';
 
@@ -21,12 +21,19 @@ interface DocumentData {
 interface DocumentDetailSidebarProps {
   document: DocumentData;
   docTypes: { id: number; name: string }[];
-  isEditing: boolean;
+  stores: { id: number; store_number: string; name: string }[];
+  isEditingType: boolean;
+  isEditingStore: boolean;
   selectedTypeId: number | null;
-  onEditStart: () => void;
-  onEditCancel: () => void;
+  selectedStoreId: number | null;
+  onTypeEditStart: () => void;
+  onTypeEditCancel: () => void;
   onTypeChange: (id: number) => void;
-  onSave: () => void;
+  onTypeSave: () => void;
+  onStoreEditStart: () => void;
+  onStoreEditCancel: () => void;
+  onStoreChange: (id: number) => void;
+  onStoreSave: () => void;
   pageFields: FinsalesFields | null;
   currentPage: number;
 }
@@ -34,12 +41,19 @@ interface DocumentDetailSidebarProps {
 export function DocumentDetailSidebar({
   document,
   docTypes,
-  isEditing,
+  stores,
+  isEditingType,
+  isEditingStore,
   selectedTypeId,
-  onEditStart,
-  onEditCancel,
+  selectedStoreId,
+  onTypeEditStart,
+  onTypeEditCancel,
   onTypeChange,
-  onSave,
+  onTypeSave,
+  onStoreEditStart,
+  onStoreEditCancel,
+  onStoreChange,
+  onStoreSave,
   pageFields,
   currentPage,
 }: DocumentDetailSidebarProps) {
@@ -57,13 +71,50 @@ export function DocumentDetailSidebar({
 
         <div>
           <label className="text-gray-500">Store</label>
-          <p className="font-medium">Store {document.batch.store.store_number}</p>
-          <p className="text-gray-600 text-xs">{document.batch.store.name}</p>
+          {isEditingStore ? (
+            <div className="mt-1 space-y-2">
+              <select
+                value={selectedStoreId ?? ''}
+                onChange={(e) => onStoreChange(parseInt(e.target.value, 10))}
+                className="w-full border rounded px-2 py-1"
+              >
+                {stores.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.store_number} - {s.name}
+                  </option>
+                ))}
+              </select>
+              <div className="flex gap-2">
+                <button
+                  onClick={onStoreSave}
+                  className="px-3 py-1 bg-primary-600 text-white rounded text-xs"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={onStoreEditCancel}
+                  className="px-3 py-1 border rounded text-xs"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="font-medium">Store {document.batch.store.store_number}</p>
+                <button onClick={onStoreEditStart} className="p-1 hover:bg-gray-100 rounded">
+                  <Edit size={14} />
+                </button>
+              </div>
+              <p className="text-gray-600 text-xs">{document.batch.store.name}</p>
+            </div>
+          )}
         </div>
 
         <div>
           <label className="text-gray-500">Document Type</label>
-          {isEditing ? (
+          {isEditingType ? (
             <div className="mt-1 space-y-2">
               <select
                 value={selectedTypeId ?? ''}
@@ -76,13 +127,13 @@ export function DocumentDetailSidebar({
               </select>
               <div className="flex gap-2">
                 <button
-                  onClick={onSave}
+                  onClick={onTypeSave}
                   className="px-3 py-1 bg-primary-600 text-white rounded text-xs"
                 >
                   Save
                 </button>
                 <button
-                  onClick={onEditCancel}
+                  onClick={onTypeEditCancel}
                   className="px-3 py-1 border rounded text-xs"
                 >
                   Cancel
@@ -92,7 +143,7 @@ export function DocumentDetailSidebar({
           ) : (
             <div className="flex items-center gap-2">
               <p className="font-medium">{document.documentType?.name ?? 'Unclassified'}</p>
-              <button onClick={onEditStart} className="p-1 hover:bg-gray-100 rounded">
+              <button onClick={onTypeEditStart} className="p-1 hover:bg-gray-100 rounded">
                 <Edit size={14} />
               </button>
             </div>
@@ -136,14 +187,6 @@ export function DocumentDetailSidebar({
           )}
         </div>
 
-        <hr className="my-4" />
-
-        <div className="space-y-2">
-          <button className="w-full flex items-center gap-2 px-3 py-2 border rounded hover:bg-gray-50 text-sm">
-            <Building size={16} />
-            Reassign Store
-          </button>
-        </div>
       </div>
     </div>
   );

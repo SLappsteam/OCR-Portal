@@ -1,4 +1,5 @@
 export interface FinsalesFields {
+  document_type?: string;
   order_id?: string;
   customer_name?: string;
   customer_id?: string;
