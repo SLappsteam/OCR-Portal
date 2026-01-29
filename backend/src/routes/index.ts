@@ -8,12 +8,14 @@ import storesRouter from './stores';
 import documentTypesRouter from './documentTypes';
 import statsRouter from './stats';
 import settingsRouter from './settings';
+import pageSearchRouter from './pageSearch';
 
 const router = Router();
 
 router.use('/health', healthRouter);
 router.use('/api/test', testProcessRouter);
 router.use('/api/documents', documentsRouter);
+router.use('/api/page-search', pageSearchRouter);
 router.use('/api/batches', batchesRouter);
 router.use('/api/preview', previewRouter);
 router.use('/api/stores', storesRouter);

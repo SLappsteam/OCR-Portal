@@ -17,3 +17,11 @@ export interface ExtractionResult {
   confidence: number;
   raw_text: string;
 }
+
+export interface PageExtractionResult {
+  page_number: number;
+  document_type: string;
+  fields: FinsalesData;
+  confidence: number;
+  raw_text: string;
+}

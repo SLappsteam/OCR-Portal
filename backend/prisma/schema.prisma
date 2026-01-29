@@ -64,26 +64,38 @@ model Batch {
 }
 
 model Document {
-  id               Int           @id @default(autoincrement())
+  id               Int              @id @default(autoincrement())
   batch_id         Int
-  reference        String?       @unique
+  reference        String?          @unique
   document_type_id Int?
   page_start       Int
   page_end         Int
-  extracted_text   String?
-  confidence_score Float?
-  metadata         Json?
-  status           String        @default("pending")
-  created_at       DateTime      @default(now())
-  updated_at       DateTime      @updatedAt
-  batch            Batch         @relation(fields: [batch_id], references: [id], onDelete: Cascade)
-  documentType     DocumentType? @relation(fields: [document_type_id], references: [id])
+  status           String           @default("pending")
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+  batch            Batch            @relation(fields: [batch_id], references: [id], onDelete: Cascade)
+  documentType     DocumentType?    @relation(fields: [document_type_id], references: [id])
+  pageExtractions  PageExtraction[]
 
   @@index([batch_id])
   @@index([document_type_id])
   @@index([status])
-  @@index([metadata], type: Gin)
   @@map("documents")
+}
+
+model PageExtraction {
+  id          Int      @id @default(autoincrement())
+  document_id Int
+  page_number Int
+  fields      Json
+  raw_text    String
+  confidence  Float
+  created_at  DateTime @default(now())
+  document    Document @relation(fields: [document_id], references: [id], onDelete: Cascade)
+
+  @@index([document_id])
+  @@index([fields], type: Gin)
+  @@map("page_extractions")
 }
 
 model User {

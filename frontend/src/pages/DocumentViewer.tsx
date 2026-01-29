@@ -1,12 +1,9 @@
-import { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
+import { useEffect, useState, useRef, useMemo } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft,
   ChevronRight,
   ArrowLeft,
-  Edit,
-  Building,
   ZoomIn,
   ZoomOut,
   RotateCcw,
@@ -16,7 +13,10 @@ import {
   fetchDocumentTypes,
   updateDocument,
   getPreviewUrl,
+  fetchDocumentExtractions,
 } from '../api/client';
+import { DocumentDetailSidebar } from '../components/DocumentDetailSidebar';
+import type { PageExtractionRecord } from '../types/extraction';
 
 interface DocumentData {
   id: number;
@@ -36,8 +36,10 @@ interface DocumentData {
 export function DocumentViewer() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [document, setDocument] = useState<DocumentData | null>(null);
   const [docTypes, setDocTypes] = useState<{ id: number; name: string }[]>([]);
+  const [extractions, setExtractions] = useState<PageExtractionRecord[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,9 +51,22 @@ export function DocumentViewer() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const totalPages = document
-    ? document.page_end - document.page_start + 1
-    : 0;
+  const totalPages = document ? document.page_end - document.page_start + 1 : 0;
+
+  const extractionMap = useMemo(() => {
+    const map = new Map<number, PageExtractionRecord>();
+    for (const ext of extractions) {
+      map.set(ext.page_number, ext);
+    }
+    return map;
+  }, [extractions]);
+
+  const currentPageFields = useMemo(() => {
+    if (!document) return null;
+    const absolutePage = document.page_start + currentPage - 1;
+    const ext = extractionMap.get(absolutePage);
+    return ext?.fields ?? null;
+  }, [document, currentPage, extractionMap]);
 
   const changePage = (newPage: number) => {
     setCurrentPage(newPage);
@@ -76,9 +91,7 @@ export function DocumentViewer() {
     setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+  const handleMouseUp = () => setIsDragging(false);
 
   const resetView = () => {
     setZoom(1);
@@ -87,22 +100,37 @@ export function DocumentViewer() {
 
   useEffect(() => {
     if (!id) return;
+    const docId = parseInt(id, 10);
 
     setIsLoading(true);
-    Promise.all([fetchDocument(parseInt(id, 10)), fetchDocumentTypes()])
-      .then(([docData, types]) => {
+    Promise.all([
+      fetchDocument(docId),
+      fetchDocumentTypes(),
+      fetchDocumentExtractions(docId),
+    ])
+      .then(([docData, types, exts]) => {
         const doc = docData as DocumentData;
         setDocument(doc);
         setDocTypes(types as { id: number; name: string }[]);
         setSelectedTypeId(doc.documentType?.id ?? null);
+        setExtractions(exts);
+
+        const pageParam = searchParams.get('page');
+        if (pageParam) {
+          const pageNum = parseInt(pageParam, 10);
+          const absolutePage = pageNum;
+          const relativePage = absolutePage - doc.page_start + 1;
+          if (relativePage >= 1 && relativePage <= doc.page_end - doc.page_start + 1) {
+            setCurrentPage(relativePage);
+          }
+        }
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setIsLoading(false));
-  }, [id]);
+  }, [id, searchParams]);
 
   const handleSaveType = async () => {
     if (!document || selectedTypeId === null) return;
-
     try {
       await updateDocument(document.id, { documentTypeId: selectedTypeId });
       const updated = await fetchDocument(document.id);
@@ -128,10 +156,7 @@ export function DocumentViewer() {
   return (
     <div className="h-[calc(100vh-6rem)] flex flex-col">
       <div className="flex items-center gap-4 mb-4">
-        <button
-          onClick={() => navigate('/documents')}
-          className="p-2 hover:bg-gray-100 rounded"
-        >
+        <button onClick={() => navigate('/documents')} className="p-2 hover:bg-gray-100 rounded">
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-xl font-bold font-mono">
@@ -178,16 +203,10 @@ export function DocumentViewer() {
             >
               <ZoomIn size={18} />
             </button>
-            <button
-              onClick={resetView}
-              className="p-1.5 hover:bg-gray-200 rounded"
-              title="Reset zoom"
-            >
+            <button onClick={resetView} className="p-1.5 hover:bg-gray-200 rounded" title="Reset zoom">
               <RotateCcw size={18} />
             </button>
-            {zoom > 1 && (
-              <span className="text-xs text-gray-500 ml-2">Drag to pan</span>
-            )}
+            {zoom > 1 && <span className="text-xs text-gray-500 ml-2">Drag to pan</span>}
           </div>
           <div
             ref={containerRef}
@@ -212,110 +231,18 @@ export function DocumentViewer() {
           </div>
         </div>
 
-        <div className="w-72 bg-white rounded-lg shadow p-4 overflow-y-auto">
-          <h2 className="font-semibold mb-4">Document Details</h2>
-
-          <div className="space-y-4 text-sm">
-            <div>
-              <label className="text-gray-500">Reference</label>
-              <p className="font-medium font-mono">
-                {document.reference ?? '-'}
-              </p>
-            </div>
-
-            <div>
-              <label className="text-gray-500">Store</label>
-              <p className="font-medium">
-                Store {document.batch.store.store_number}
-              </p>
-              <p className="text-gray-600 text-xs">
-                {document.batch.store.name}
-              </p>
-            </div>
-
-            <div>
-              <label className="text-gray-500">Document Type</label>
-              {isEditing ? (
-                <div className="mt-1 space-y-2">
-                  <select
-                    value={selectedTypeId ?? ''}
-                    onChange={(e) =>
-                      setSelectedTypeId(parseInt(e.target.value, 10))
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  >
-                    {docTypes.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleSaveType}
-                      className="px-3 py-1 bg-primary-600 text-white rounded text-xs"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => setIsEditing(false)}
-                      className="px-3 py-1 border rounded text-xs"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <p className="font-medium">
-                    {document.documentType?.name ?? 'Unclassified'}
-                  </p>
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="p-1 hover:bg-gray-100 rounded"
-                  >
-                    <Edit size={14} />
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="text-gray-500">Pages</label>
-              <p className="font-medium">
-                {totalPages} page{totalPages > 1 ? 's' : ''}
-              </p>
-            </div>
-
-            <div>
-              <label className="text-gray-500">Batch</label>
-              <p className="font-medium truncate" title={document.batch.file_name}>
-                {document.batch.file_name}
-              </p>
-            </div>
-
-            <div>
-              <label className="text-gray-500">Created</label>
-              <p className="font-medium">
-                {format(new Date(document.created_at), 'MMM d, yyyy h:mm a')}
-              </p>
-            </div>
-
-            <div>
-              <label className="text-gray-500">Status</label>
-              <p className="font-medium capitalize">{document.status}</p>
-            </div>
-
-            <hr className="my-4" />
-
-            <div className="space-y-2">
-              <button className="w-full flex items-center gap-2 px-3 py-2 border rounded hover:bg-gray-50 text-sm">
-                <Building size={16} />
-                Reassign Store
-              </button>
-            </div>
-          </div>
-        </div>
+        <DocumentDetailSidebar
+          document={document}
+          docTypes={docTypes}
+          isEditing={isEditing}
+          selectedTypeId={selectedTypeId}
+          onEditStart={() => setIsEditing(true)}
+          onEditCancel={() => setIsEditing(false)}
+          onTypeChange={setSelectedTypeId}
+          onSave={handleSaveType}
+          pageFields={currentPageFields}
+          currentPage={currentPage}
+        />
       </div>
 
       <div className="mt-4 flex items-center justify-center gap-4 bg-white rounded-lg shadow p-3">
@@ -335,9 +262,7 @@ export function DocumentViewer() {
             value={currentPage}
             onChange={(e) => {
               const val = parseInt(e.target.value, 10);
-              if (val >= 1 && val <= totalPages) {
-                changePage(val);
-              }
+              if (val >= 1 && val <= totalPages) changePage(val);
             }}
             className="w-12 text-center border rounded px-1 py-0.5"
           />{' '}

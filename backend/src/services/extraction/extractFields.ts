@@ -1,46 +1,58 @@
 import Tesseract from 'tesseract.js';
 import { extractPageAsPng } from '../tiffService';
 import { parseFinsalesText, calculateConfidence } from './finsalesParser';
-import { ExtractionResult } from './types';
+import { PageExtractionResult } from './types';
 import { logger } from '../../utils/logger';
 
 const SUPPORTED_DOC_TYPES = ['FINSALES'];
 
-export async function extractDocumentFields(
+export async function extractAllPages(
   filePath: string,
   pageStart: number,
   pageEnd: number,
   docTypeCode: string
-): Promise<ExtractionResult | null> {
+): Promise<PageExtractionResult[]> {
   if (!SUPPORTED_DOC_TYPES.includes(docTypeCode)) {
-    return null;
+    return [];
   }
 
-  const contentPage = pageStart + 1;
-  if (contentPage > pageEnd) {
-    logger.warn(`No content page for ${docTypeCode} doc (only coversheet)`);
-    return null;
+  const results: PageExtractionResult[] = [];
+
+  for (let page = pageStart + 1; page <= pageEnd; page++) {
+    const result = await extractSinglePage(filePath, page, docTypeCode);
+    if (result) {
+      results.push(result);
+    }
   }
 
+  return results;
+}
+
+export async function extractSinglePage(
+  filePath: string,
+  pageNumber: number,
+  docTypeCode: string
+): Promise<PageExtractionResult | null> {
   try {
-    const pageBuffer = await extractPageAsPng(filePath, contentPage);
+    const pageBuffer = await extractPageAsPng(filePath, pageNumber);
     const rawText = await ocrFullPage(pageBuffer);
     const fields = parseFinsalesText(rawText);
     const confidence = calculateConfidence(fields);
 
     logger.info(
-      `Extracted ${docTypeCode} fields: confidence=${(confidence * 100).toFixed(0)}%, ` +
+      `Extracted ${docTypeCode} page ${pageNumber}: confidence=${(confidence * 100).toFixed(0)}%, ` +
       `order=${fields.order_id}, customer=${fields.customer_name}`
     );
 
     return {
+      page_number: pageNumber,
       document_type: docTypeCode,
       fields,
       confidence,
       raw_text: rawText,
     };
   } catch (error) {
-    logger.error(`Field extraction failed for ${docTypeCode}:`, error);
+    logger.error(`Page extraction failed for ${docTypeCode} page ${pageNumber}:`, error);
     return null;
   }
 }

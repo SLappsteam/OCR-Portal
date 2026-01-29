@@ -1,7 +1,7 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { analyzeTiff } from './documentSplitter';
 import { getDocumentTypeByCode } from './barcodeService';
-import { extractDocumentFields } from './extraction';
+import { extractAllPages } from './extraction';
 import { logger } from '../utils/logger';
 
 const prisma = new PrismaClient();
@@ -56,31 +56,34 @@ async function createDocumentRecord(
   return doc.id;
 }
 
-async function extractAndStoreMetadata(
+async function extractAndStorePageData(
   docId: number,
   filePath: string,
   boundary: { documentTypeCode: string; startPage: number; endPage: number }
 ): Promise<void> {
   try {
-    const result = await extractDocumentFields(
+    const pages = await extractAllPages(
       filePath,
       boundary.startPage,
       boundary.endPage,
       boundary.documentTypeCode
     );
 
-    if (!result) return;
+    if (pages.length === 0) return;
 
-    await prisma.document.update({
-      where: { id: docId },
-      data: {
-        metadata: result.fields as unknown as Prisma.JsonObject,
-        extracted_text: result.raw_text,
-        confidence_score: result.confidence,
-      },
+    await prisma.pageExtraction.createMany({
+      data: pages.map((p) => ({
+        document_id: docId,
+        page_number: p.page_number,
+        fields: p.fields as unknown as Prisma.JsonObject,
+        raw_text: p.raw_text,
+        confidence: p.confidence,
+      })),
     });
+
+    logger.info(`Stored ${pages.length} page extractions for doc ${docId}`);
   } catch (error) {
-    logger.error(`Metadata extraction failed for doc ${docId}:`, error);
+    logger.error(`Page extraction failed for doc ${docId}:`, error);
   }
 }
 
@@ -113,7 +116,7 @@ export async function processBatch(batchId: number): Promise<void> {
     for (const boundary of boundaries) {
       if (boundary) {
         const docId = await createDocumentRecord(batchId, storeNumber, boundary);
-        await extractAndStoreMetadata(docId, batch.file_path, boundary);
+        await extractAndStorePageData(docId, batch.file_path, boundary);
       }
     }
 

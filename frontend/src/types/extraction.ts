@@ -1,0 +1,34 @@
+export interface FinsalesFields {
+  order_id?: string;
+  customer_name?: string;
+  customer_id?: string;
+  address?: string;
+  city_state_zip?: string;
+  phone?: string;
+  delivery_date?: string;
+  salesperson?: string;
+  truck_id?: string;
+  total_sale?: string;
+}
+
+export interface PageExtractionRecord {
+  id: number;
+  document_id: number;
+  page_number: number;
+  fields: FinsalesFields;
+  confidence: number;
+  raw_text: string;
+  created_at: string;
+}
+
+export interface PageSearchResult {
+  document_id: number;
+  page_number: number;
+  fields: FinsalesFields;
+  confidence: number;
+  document_reference: string | null;
+  document_type_code: string | null;
+  document_type_name: string | null;
+  store_number: string;
+  created_at: string;
+}
