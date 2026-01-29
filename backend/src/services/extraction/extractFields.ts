@@ -1,5 +1,6 @@
 import Tesseract from 'tesseract.js';
 import { extractPageAsPng } from '../tiffService';
+import { correctPageImage } from '../imageCorrection';
 import { parseFinsalesText, calculateConfidence } from './finsalesParser';
 import { PageExtractionResult } from './types';
 import { logger } from '../../utils/logger';
@@ -35,7 +36,8 @@ export async function extractSinglePage(
 ): Promise<PageExtractionResult | null> {
   try {
     const pageBuffer = await extractPageAsPng(filePath, pageNumber);
-    const rawText = await ocrFullPage(pageBuffer);
+    const corrected = await correctPageImage(pageBuffer);
+    const rawText = await ocrFullPage(corrected);
     const fields = parseFinsalesText(rawText);
     const confidence = calculateConfidence(fields);
 

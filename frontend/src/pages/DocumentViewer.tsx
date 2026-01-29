@@ -7,6 +7,7 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  RotateCw,
 } from 'lucide-react';
 import {
   fetchDocument,
@@ -51,7 +52,7 @@ export function DocumentViewer() {
   const [isEditingStore, setIsEditingStore] = useState(false);
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
-  const { zoom, setZoom, pan, isDragging, handleWheel, handleMouseDown, handleMouseMove, handleMouseUp, resetView } = useZoomPan();
+  const { zoom, setZoom, pan, isDragging, rotation, handleWheel, handleMouseDown, handleMouseMove, handleMouseUp, rotateLeft, rotateRight, resetView } = useZoomPan();
 
   const totalPages = document ? document.page_end - document.page_start + 1 : 0;
 
@@ -199,8 +200,16 @@ export function DocumentViewer() {
             >
               <ZoomIn size={18} />
             </button>
-            <button onClick={resetView} className="p-1.5 hover:bg-gray-200 rounded" title="Reset zoom">
+            <div className="w-px h-5 bg-gray-300 mx-1" />
+            <button onClick={rotateLeft} className="p-1.5 hover:bg-gray-200 rounded" title="Rotate left">
               <RotateCcw size={18} />
+            </button>
+            <button onClick={rotateRight} className="p-1.5 hover:bg-gray-200 rounded" title="Rotate right">
+              <RotateCw size={18} />
+            </button>
+            <div className="w-px h-5 bg-gray-300 mx-1" />
+            <button onClick={resetView} className="p-1.5 hover:bg-gray-200 rounded" title="Reset view">
+              <RotateCcw size={18} className="text-gray-500" />
             </button>
             {zoom > 1 && <span className="text-xs text-gray-500 ml-2">Drag to pan</span>}
           </div>
@@ -217,7 +226,7 @@ export function DocumentViewer() {
               src={getPreviewUrl(document.id, currentPage)}
               alt={`Page ${currentPage}`}
               style={{
-                transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px) rotate(${rotation}deg)`,
                 transformOrigin: 'center center',
               }}
               className="max-w-full max-h-full object-contain select-none"

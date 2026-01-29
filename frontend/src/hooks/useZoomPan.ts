@@ -5,6 +5,7 @@ export function useZoomPan() {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [rotation, setRotation] = useState(0);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -25,13 +26,23 @@ export function useZoomPan() {
 
   const handleMouseUp = useCallback(() => setIsDragging(false), []);
 
+  const rotateLeft = useCallback(() => {
+    setRotation((r) => (r - 90 + 360) % 360);
+  }, []);
+
+  const rotateRight = useCallback(() => {
+    setRotation((r) => (r + 90) % 360);
+  }, []);
+
   const resetView = useCallback(() => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
+    setRotation(0);
   }, []);
 
   return {
-    zoom, setZoom, pan, isDragging,
-    handleWheel, handleMouseDown, handleMouseMove, handleMouseUp, resetView,
+    zoom, setZoom, pan, isDragging, rotation,
+    handleWheel, handleMouseDown, handleMouseMove, handleMouseUp,
+    rotateLeft, rotateRight, resetView,
   };
 }
