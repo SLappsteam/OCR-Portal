@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import path from 'path';
 import { PrismaClient } from '@prisma/client';
+import { clearStorageFiles } from '../services/storageService';
 import { ApiResponse } from '../types';
 import { logger } from '../utils/logger';
 
@@ -48,8 +49,9 @@ router.post('/clear-data', async (_req: Request, res: Response, next: NextFuncti
   try {
     const deletedDocs = await prisma.document.deleteMany({});
     const deletedBatches = await prisma.batch.deleteMany({});
+    await clearStorageFiles();
 
-    logger.info(`Cleared data: ${deletedDocs.count} documents, ${deletedBatches.count} batches (stores preserved)`);
+    logger.info(`Cleared data: ${deletedDocs.count} documents, ${deletedBatches.count} batches, storage files removed`);
 
     const response: ApiResponse<{ documents: number; batches: number }> = {
       success: true,

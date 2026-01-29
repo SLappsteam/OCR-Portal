@@ -17,6 +17,7 @@ export function isTicketPage(rawText: string): boolean {
 export function parseTicketText(rawText: string): FinsalesData {
   return {
     ticket_type: extractTicketType(rawText),
+    order_type: null,
     order_id: extractOrderId(rawText),
     customer_name: extractCustomerName(rawText),
     customer_id: extractField(rawText, CUSTOMER_ID_PATTERN),

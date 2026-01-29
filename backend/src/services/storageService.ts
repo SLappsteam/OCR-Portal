@@ -1,4 +1,4 @@
-import { copyFile, mkdir, rename, unlink } from 'fs/promises';
+import { copyFile, mkdir, rename, unlink, rm } from 'fs/promises';
 import path from 'path';
 import { logger } from '../utils/logger';
 
@@ -65,4 +65,16 @@ export async function ensureStorageDirectories(): Promise<void> {
     await mkdir(ARCHIVE_FOLDER_PATH, { recursive: true });
   }
   logger.info('Storage directories initialized');
+}
+
+export async function clearStorageFiles(): Promise<void> {
+  await rm(TIFF_STORAGE_PATH, { recursive: true, force: true });
+  await mkdir(TIFF_STORAGE_PATH, { recursive: true });
+  logger.info(`Cleared storage: ${TIFF_STORAGE_PATH}`);
+
+  if (ARCHIVE_FOLDER_PATH) {
+    await rm(ARCHIVE_FOLDER_PATH, { recursive: true, force: true });
+    await mkdir(ARCHIVE_FOLDER_PATH, { recursive: true });
+    logger.info(`Cleared archive: ${ARCHIVE_FOLDER_PATH}`);
+  }
 }

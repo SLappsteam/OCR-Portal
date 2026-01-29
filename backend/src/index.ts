@@ -8,8 +8,11 @@ import { errorHandler } from './middleware/errorHandler';
 import { routes } from './routes';
 import { startWatcher, stopWatcher } from './services/watcherService';
 import { ensureStorageDirectories } from './services/storageService';
+import { acquireLock, releaseLock } from './utils/processLock';
 
 dotenv.config();
+
+acquireLock();
 
 const app: Application = express();
 const PORT = process.env['PORT'] ?? 3000;
@@ -33,6 +36,7 @@ async function startup(): Promise<void> {
 
 function shutdown(): void {
   logger.info('Shutting down gracefully...');
+  releaseLock();
   stopWatcher();
 
   if (server) {

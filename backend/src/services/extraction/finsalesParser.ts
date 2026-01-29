@@ -1,12 +1,14 @@
 import { FinsalesData } from './types';
 
 export function parseFinsalesText(rawText: string): FinsalesData {
+  const { address, orderType } = extractAddressAndOrderType(rawText);
   return {
     ticket_type: null,
+    order_type: orderType,
     order_id: extractOrderId(rawText),
     customer_name: extractCustomerName(rawText),
     customer_id: null,
-    address: extractAddress(rawText),
+    address,
     city_state_zip: extractCityStateZip(rawText),
     phone: extractPhone(rawText),
     delivery_date: extractDate(rawText),
@@ -52,8 +54,9 @@ function extractCustomerName(text: string): string | null {
   return null;
 }
 
-function extractAddress(text: string): string | null {
-  // Line after ORDER TYPE: "{store city/zip} {customer address} Pickup"
+function extractAddressAndOrderType(
+  text: string
+): { address: string | null; orderType: string | null } {
   const lines = text.split('\n');
   for (let i = 0; i < lines.length; i++) {
     if (!/ORDER\s+TYPE/i.test(lines[i] ?? '')) continue;
@@ -66,9 +69,12 @@ function extractAddress(text: string): string | null {
     );
     if (!afterZip || afterZip === nextLine) continue;
 
-    return afterZip.replace(/\s*(Pickup|Delivery)\s*$/i, '').trim() || null;
+    const typeMatch = afterZip.match(/\s+(Pickup|Delivery)\s*[|]?\s*$/i);
+    const orderType = typeMatch?.[1] ? typeMatch[1].trim() : null;
+    const address = afterZip.replace(/\s*(Pickup|Delivery)\s*[|]?\s*$/i, '').trim() || null;
+    return { address, orderType };
   }
-  return null;
+  return { address: null, orderType: null };
 }
 
 function extractCityStateZip(text: string): string | null {
