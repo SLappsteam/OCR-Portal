@@ -1,0 +1,31 @@
+import { parseSummaryText, isSummaryPage } from '../src/services/extraction/summaryParser';
+
+const sampleText = `Order Customer Type Status Products Order Date Order Site Total Delivery Delivery De Shipping
+
+0114578PQ83D * MARILYN OLSON SAL F WIO8 Floor #iti 78 204.6 P 3/8/2025 78
+0118578GC68A  ~KELLIE GIFFORD SAL F RECLINING #####i## 78 141298 P 3/7/2025 78
+0118578GF88 <CLINTON GIFFORD SAL F WI06 Rock: ##itit 78 847.99 P 3/8/2025 78
+0126578DR88 v MARY LONG SAL F WI04 Oak ( #it#iHitii 78 190.79 P 3/7/2025 78
+0204578HV94 + CLARICE MATHIS SAL F WI16 Quee 2/4/2025 78 614.26 P 3/7/2025 78
+0207578TM63A * TAWNY KRUSE SAL F WI05 Coba 2/7/2025 78 322.23 P 3/7/2025 78
+0208578UF19A ~ RUTH MICHENER SAL F WI15 BLAC 2/8/2025 78 317.99 P 3/7/2025 78
+0210578YD26 + Cail Bishop SAL F WI04 Ice Ri #itHHH 78 698.53 P 3/7/2025 78
+0217578TE88 * HERMAN POGGENSEE SAL F WI15 ACCE #ititH#h 78 367.54 P 3/7/2025 78
+0220578HY19 "MELISSA HINTZ SAL F WI05 Rock: siti 78 906.29 P Hitt 78
+0222578NK52A » SAM NELSON SAL F WI06 Char #it#tiHiii# 78 1091.78 P 3/7/2025 78
+0226578BB95 "EVELYN DANIELS SAL F WI20 Dove ##iti#i# 78 529.99 P 3/7/2025 78
+0226578BQ59  » DARLENE FINI SAL F NA Rocker Hits 78 845.88 P 3/7/2025 78
+0226578YS75 A BRUCE/KRISTIN REESE SAL F WI10 Ocea #i#HiHt 78 423.99 P 3/7/2025 78
+0302578ND76  * COLE MITCHELL SAL F WI04 Jute t 3/2/2025 78 339.2 p 3/7/2025 78
+0304578VL26 * KELLEY CROSBIE SAL F WI04 Platfc 3/4/2025 78 oP HHH HH 78
+0307578HM57  - Jaci Hartley SAL F SDO2 FLPu 3/7/2025 78 307.39 P Hitt 78
+0308578J031 «TIM CROWDER SAL F NA Power | 3/8/2025 78 424 Pp 3/8/2025 78`;
+
+console.log('isSummaryPage:', isSummaryPage(sampleText));
+console.log();
+
+const orders = parseSummaryText(sampleText);
+console.log(`Found ${orders.length} orders:\n`);
+for (const o of orders) {
+  console.log(`  ${o.order_id.padEnd(16)} ${o.customer_name}`);
+}

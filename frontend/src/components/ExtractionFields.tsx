@@ -4,7 +4,7 @@ interface ExtractionFieldsProps {
   fields: FinsalesFields;
 }
 
-const FIELD_LABELS: Record<keyof FinsalesFields, string> = {
+const FIELD_LABELS: Record<string, string> = {
   document_type: 'Document Type',
   order_id: 'Order ID',
   customer_name: 'Customer Name',
@@ -19,10 +19,16 @@ const FIELD_LABELS: Record<keyof FinsalesFields, string> = {
 };
 
 export function ExtractionFields({ fields }: ExtractionFieldsProps) {
-  const entries = Object.entries(FIELD_LABELS) as [keyof FinsalesFields, string][];
-  const populatedFields = entries.filter(([key]) => fields[key]);
+  if (fields.orders && fields.orders.length > 0) {
+    return <OrdersSummary orders={fields.orders} />;
+  }
 
-  if (populatedFields.length === 0) {
+  const entries = Object.entries(FIELD_LABELS);
+  const populated = entries.filter(
+    ([key]) => fields[key as keyof FinsalesFields]
+  );
+
+  if (populated.length === 0) {
     return (
       <p className="text-gray-400 text-sm italic">No extracted data for this page</p>
     );
@@ -30,12 +36,36 @@ export function ExtractionFields({ fields }: ExtractionFieldsProps) {
 
   return (
     <div className="space-y-2">
-      {populatedFields.map(([key, label]) => (
+      {populated.map(([key, label]) => (
         <div key={key}>
           <label className="text-gray-500 text-xs">{label}</label>
-          <p className="font-medium text-sm">{fields[key]}</p>
+          <p className="font-medium text-sm">
+            {fields[key as keyof FinsalesFields] as string}
+          </p>
         </div>
       ))}
+    </div>
+  );
+}
+
+function OrdersSummary({ orders }: { orders: FinsalesFields['orders'] }) {
+  return (
+    <div>
+      <p className="text-gray-500 text-xs mb-2">
+        {orders!.length} order{orders!.length !== 1 ? 's' : ''} on this page
+      </p>
+      <div className="space-y-1.5 max-h-64 overflow-y-auto">
+        {orders!.map((o, i) => (
+          <div key={i} className="flex justify-between gap-2 text-sm border-b border-gray-50 pb-1">
+            <span className="font-mono text-xs text-gray-600 shrink-0">
+              {o.order_id}
+            </span>
+            <span className="font-medium text-right truncate">
+              {o.customer_name}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

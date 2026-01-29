@@ -6,6 +6,7 @@ import {
   flexRender,
   type SortingState,
   type ColumnDef,
+  type OnChangeFn,
 } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { ChevronUp, ChevronDown } from 'lucide-react';
@@ -15,7 +16,7 @@ import type { PageSearchResult } from '../types/extraction';
 interface PageSearchTableProps {
   results: PageSearchResult[];
   sorting: SortingState;
-  onSortingChange: (sorting: SortingState) => void;
+  onSortingChange: OnChangeFn<SortingState>;
   onRowClick: (documentId: number, pageNumber: number) => void;
 }
 
@@ -32,10 +33,10 @@ export function PageSearchTable({
         header: '',
         cell: ({ row }) => {
           const code = row.original.document_type_code ?? 'UNCLASSIFIED';
-          const config = docTypeIcons[code] ?? docTypeIcons['UNCLASSIFIED'];
-          const Icon = config.icon;
+          const config = docTypeIcons[code] ?? docTypeIcons['UNCLASSIFIED']!;
+          const Icon = config!.icon;
           return (
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${config.color}`}>
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${config!.color}`}>
               <Icon size={20} />
             </div>
           );

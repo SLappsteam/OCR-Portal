@@ -1,5 +1,11 @@
+export interface SummaryOrder {
+  order_id: string;
+  customer_name: string;
+}
+
 export interface FinsalesFields {
   document_type?: string;
+  orders?: SummaryOrder[];
   order_id?: string;
   customer_name?: string;
   customer_id?: string;

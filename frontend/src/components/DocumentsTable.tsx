@@ -6,6 +6,7 @@ import {
   flexRender,
   type SortingState,
   type ColumnDef,
+  type OnChangeFn,
 } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { ChevronUp, ChevronDown } from 'lucide-react';
@@ -14,7 +15,7 @@ import { docTypeIcons, type DocumentRow } from './docTypeIcons';
 interface DocumentsTableProps {
   documents: DocumentRow[];
   sorting: SortingState;
-  onSortingChange: (sorting: SortingState) => void;
+  onSortingChange: OnChangeFn<SortingState>;
   onRowClick: (id: number) => void;
 }
 
@@ -31,10 +32,10 @@ export function DocumentsTable({
         header: '',
         cell: ({ row }) => {
           const code = row.original.documentType?.code ?? 'UNCLASSIFIED';
-          const config = docTypeIcons[code] ?? docTypeIcons['UNCLASSIFIED'];
-          const Icon = config.icon;
+          const config = docTypeIcons[code] ?? docTypeIcons['UNCLASSIFIED']!;
+          const Icon = config!.icon;
           return (
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${config.color}`}>
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${config!.color}`}>
               <Icon size={20} />
             </div>
           );
