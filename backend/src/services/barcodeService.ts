@@ -28,8 +28,8 @@ async function cropForBarcode(
   const width = metadata.width ?? 1700;
   const height = metadata.height ?? 2200;
 
-  const cropTop = Math.floor(height * 0.35);
-  const cropHeight = Math.floor(height * 0.15);
+  const cropTop = Math.floor(height * 0.25);
+  const cropHeight = Math.floor(height * 0.25);
 
   const { data, info } = await sharp(imageBuffer)
     .extract({ left: 0, top: cropTop, width, height: cropHeight })
