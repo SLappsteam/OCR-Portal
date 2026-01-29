@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { ApiResponse } from '../types';
 import { BadRequestError, NotFoundError } from '../middleware/errorHandler';
@@ -21,6 +21,7 @@ const querySchema = z.object({
   documentType: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
+  search: z.string().optional(),
 });
 
 const updateSchema = z.object({
@@ -35,7 +36,18 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       throw new BadRequestError('Invalid query parameters');
     }
 
-    const { storeNumber, documentType, startDate, endDate } = parsed.data;
+    const { storeNumber, documentType, startDate, endDate, search } = parsed.data;
+
+    const searchFilter: Prisma.DocumentWhereInput = search
+      ? {
+          OR: [
+            { metadata: { path: ['customer_name'], string_contains: search } },
+            { metadata: { path: ['order_id'], string_contains: search } },
+            { metadata: { path: ['customer_id'], string_contains: search } },
+            { metadata: { path: ['phone'], string_contains: search } },
+          ],
+        }
+      : {};
 
     const documents = await prisma.document.findMany({
       where: {
@@ -47,6 +59,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
           gte: startDate ? new Date(startDate) : undefined,
           lte: endDate ? new Date(endDate) : undefined,
         },
+        ...searchFilter,
       },
       include: {
         batch: {

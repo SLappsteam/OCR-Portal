@@ -233,16 +233,16 @@ export function Batches() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Batches</h1>
+      <h1 className="text-xl font-semibold text-gray-900">Batches</h1>
 
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="flex flex-wrap gap-4">
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex flex-wrap gap-3">
           <select
             value={filters.storeNumber}
             onChange={(e) =>
               setFilters((f) => ({ ...f, storeNumber: e.target.value }))
             }
-            className="border rounded px-3 py-2"
+            className="border border-gray-200 rounded px-3 py-2 text-sm"
           >
             <option value="">All Stores</option>
             {stores.map((s) => (
@@ -257,7 +257,7 @@ export function Batches() {
             onChange={(e) =>
               setFilters((f) => ({ ...f, status: e.target.value }))
             }
-            className="border rounded px-3 py-2"
+            className="border border-gray-200 rounded px-3 py-2 text-sm"
           >
             <option value="">All Statuses</option>
             <option value="pending">Pending</option>
@@ -268,21 +268,21 @@ export function Batches() {
 
           <button
             onClick={loadBatches}
-            className="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200"
+            className="px-3 py-2 border border-gray-200 rounded hover:bg-gray-50"
           >
-            <RefreshCw size={16} />
+            <RefreshCw size={16} className="text-gray-600" />
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center text-gray-500">Loading...</div>
         ) : batches.length === 0 ? (
           <div className="p-8 text-center text-gray-500">No batches found</div>
         ) : (
           <table className="w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 border-b border-gray-100">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
@@ -308,7 +308,7 @@ export function Batches() {
                 </tr>
               ))}
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-gray-100">
               {table.getRowModel().rows.map((row) => (
                 <Fragment key={row.id}>
                   <tr className="hover:bg-gray-50">

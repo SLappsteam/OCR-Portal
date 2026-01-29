@@ -1,6 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { analyzeTiff } from './documentSplitter';
 import { getDocumentTypeByCode } from './barcodeService';
+import { extractDocumentFields } from './extraction';
 import { logger } from '../utils/logger';
 
 const prisma = new PrismaClient();
@@ -30,7 +31,7 @@ async function createDocumentRecord(
     startPage: number;
     endPage: number;
   }
-): Promise<void> {
+): Promise<number> {
   const docType = await getDocumentTypeByCode(boundary.documentTypeCode);
 
   const doc = await prisma.document.create({
@@ -51,6 +52,36 @@ async function createDocumentRecord(
 
   const pageCount = boundary.endPage - boundary.startPage + 1;
   logger.info(`  Created document ${reference}: type=${boundary.documentTypeCode}, pages ${boundary.startPage}-${boundary.endPage} (${pageCount} pages)`);
+
+  return doc.id;
+}
+
+async function extractAndStoreMetadata(
+  docId: number,
+  filePath: string,
+  boundary: { documentTypeCode: string; startPage: number; endPage: number }
+): Promise<void> {
+  try {
+    const result = await extractDocumentFields(
+      filePath,
+      boundary.startPage,
+      boundary.endPage,
+      boundary.documentTypeCode
+    );
+
+    if (!result) return;
+
+    await prisma.document.update({
+      where: { id: docId },
+      data: {
+        metadata: result.fields as unknown as Prisma.JsonObject,
+        extracted_text: result.raw_text,
+        confidence_score: result.confidence,
+      },
+    });
+  } catch (error) {
+    logger.error(`Metadata extraction failed for doc ${docId}:`, error);
+  }
 }
 
 export async function processBatch(batchId: number): Promise<void> {
@@ -81,7 +112,8 @@ export async function processBatch(batchId: number): Promise<void> {
 
     for (const boundary of boundaries) {
       if (boundary) {
-        await createDocumentRecord(batchId, storeNumber, boundary);
+        const docId = await createDocumentRecord(batchId, storeNumber, boundary);
+        await extractAndStoreMetadata(docId, batch.file_path, boundary);
       }
     }
 

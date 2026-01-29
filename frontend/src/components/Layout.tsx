@@ -31,32 +31,32 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation();
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      <aside className="w-64 bg-slate-800 text-white flex flex-col">
-        <div className="p-4 border-b border-slate-700">
+    <div className="flex h-screen bg-gray-50">
+      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col">
+        <div className="p-4 border-b border-gray-100 flex flex-col items-center">
           <img
             src="/logo.png"
             alt="Slumberland"
-            className="h-10 w-auto"
+            className="h-8 w-auto"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
             }}
           />
-          <h1 className="text-lg font-semibold mt-2">Document Portal</h1>
+          <p className="text-xs text-gray-400 mt-1">Document Portal</p>
         </div>
 
-        <nav className="flex-1 p-4">
-          <ul className="space-y-1">
+        <nav className="flex-1 p-3">
+          <ul className="space-y-0.5">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
                 <li key={item.path}>
                   <Link
                     to={item.path}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-sm ${
                       isActive
-                        ? 'bg-primary-600 text-white'
-                        : 'text-slate-300 hover:bg-slate-700'
+                        ? 'bg-gray-100 text-gray-900 font-medium'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
                   >
                     {item.icon}
@@ -68,20 +68,20 @@ export function Layout({ children }: LayoutProps) {
           </ul>
         </nav>
 
-        <div className="p-4 border-t border-slate-700">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-slate-600 rounded-full flex items-center justify-center">
-              <User size={16} />
+        <div className="p-3 border-t border-gray-100">
+          <div className="flex items-center gap-3 px-2">
+            <div className="w-7 h-7 bg-gray-200 rounded-full flex items-center justify-center">
+              <User size={14} className="text-gray-500" />
             </div>
-            <div className="text-sm">
-              <div className="font-medium">Admin User</div>
-              <div className="text-slate-400 text-xs">admin@slumberland.com</div>
+            <div className="text-xs">
+              <div className="font-medium text-gray-700">Admin User</div>
+              <div className="text-gray-400">admin@slumberland.com</div>
             </div>
           </div>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto bg-white">
         <div className="p-6">{children}</div>
       </main>
     </div>

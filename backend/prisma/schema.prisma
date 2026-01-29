@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -72,7 +72,7 @@ model Document {
   page_end         Int
   extracted_text   String?
   confidence_score Float?
-  metadata         String?
+  metadata         Json?
   status           String        @default("pending")
   created_at       DateTime      @default(now())
   updated_at       DateTime      @updatedAt
@@ -82,6 +82,7 @@ model Document {
   @@index([batch_id])
   @@index([document_type_id])
   @@index([status])
+  @@index([metadata], type: Gin)
   @@map("documents")
 }
 

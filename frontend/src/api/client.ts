@@ -105,12 +105,14 @@ export async function fetchDocuments(params?: {
   documentType?: string;
   startDate?: string;
   endDate?: string;
+  search?: string;
 }) {
   const searchParams = new URLSearchParams();
   if (params?.storeNumber) searchParams.set('storeNumber', params.storeNumber);
   if (params?.documentType) searchParams.set('documentType', params.documentType);
   if (params?.startDate) searchParams.set('startDate', params.startDate);
   if (params?.endDate) searchParams.set('endDate', params.endDate);
+  if (params?.search) searchParams.set('search', params.search);
 
   const query = searchParams.toString();
   const endpoint = `/api/documents${query ? `?${query}` : ''}`;

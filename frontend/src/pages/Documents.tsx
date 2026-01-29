@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   useReactTable,
@@ -22,6 +22,7 @@ import {
   Landmark,
   HelpCircle,
   FileQuestion,
+  Search,
 } from 'lucide-react';
 import {
   fetchDocuments,
@@ -45,12 +46,26 @@ const docTypeIcons: Record<string, { icon: React.ElementType; color: string }> =
   UNCLASSIFIED: { icon: HelpCircle, color: 'bg-gray-100 text-gray-400' },
 };
 
+interface DocumentMetadata {
+  order_id?: string;
+  customer_name?: string;
+  customer_id?: string;
+  address?: string;
+  city_state_zip?: string;
+  phone?: string;
+  delivery_date?: string;
+  salesperson?: string;
+  truck_id?: string;
+  total_sale?: string;
+}
+
 interface DocumentRow {
   id: number;
   reference: string | null;
   page_start: number;
   page_end: number;
   created_at: string;
+  metadata: DocumentMetadata | null;
   batch: {
     store: { store_number: string };
   };
@@ -70,7 +85,18 @@ export function Documents() {
     documentType: '',
     startDate: '',
     endDate: '',
+    search: '',
   });
+  const [searchInput, setSearchInput] = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchInput(value);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setFilters((f) => ({ ...f, search: value }));
+    }, 400);
+  }, []);
 
   useEffect(() => {
     Promise.all([fetchStores(), fetchDocumentTypes()])
@@ -83,7 +109,8 @@ export function Documents() {
 
   useEffect(() => {
     setIsLoading(true);
-    fetchDocuments(filters.storeNumber || filters.documentType ? filters : undefined)
+    const hasFilters = filters.storeNumber || filters.documentType || filters.search;
+    fetchDocuments(hasFilters ? filters : undefined)
       .then((data) => setDocuments(data as DocumentRow[]))
       .catch(console.error)
       .finally(() => setIsLoading(false));
@@ -121,8 +148,7 @@ export function Documents() {
         header: 'Pages',
         accessorFn: (row) => row.page_end - row.page_start + 1,
         cell: ({ row }) => {
-          const count = row.original.page_end - row.original.page_start + 1;
-          return `${count} page${count > 1 ? 's' : ''}`;
+          return row.original.page_end - row.original.page_start + 1;
         },
       },
       {
@@ -137,12 +163,22 @@ export function Documents() {
       {
         id: 'customer_name',
         header: 'Customer',
-        cell: () => <span className="text-gray-400">-</span>,
+        cell: ({ row }) => {
+          const name = row.original.metadata?.customer_name;
+          return name
+            ? <span>{name}</span>
+            : <span className="text-gray-400">-</span>;
+        },
       },
       {
         id: 'document_date',
         header: 'Document Date',
-        cell: () => <span className="text-gray-400">-</span>,
+        cell: ({ row }) => {
+          const date = row.original.metadata?.delivery_date;
+          return date
+            ? <span>{date}</span>
+            : <span className="text-gray-400">-</span>;
+        },
       },
       {
         accessorKey: 'created_at',
@@ -173,16 +209,27 @@ export function Documents() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Documents</h1>
+      <h1 className="text-xl font-semibold text-gray-900">Documents</h1>
 
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="flex flex-wrap gap-4">
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex flex-wrap gap-3">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search customer, order, phone..."
+              className="border border-gray-200 rounded pl-9 pr-3 py-2 text-sm w-64"
+            />
+          </div>
+
           <select
             value={filters.storeNumber}
             onChange={(e) =>
               setFilters((f) => ({ ...f, storeNumber: e.target.value }))
             }
-            className="border rounded px-3 py-2"
+            className="border border-gray-200 rounded px-3 py-2 text-sm"
           >
             <option value="">All Stores</option>
             {stores.map((s) => (
@@ -197,7 +244,7 @@ export function Documents() {
             onChange={(e) =>
               setFilters((f) => ({ ...f, documentType: e.target.value }))
             }
-            className="border rounded px-3 py-2"
+            className="border border-gray-200 rounded px-3 py-2 text-sm"
           >
             <option value="">All Types</option>
             {docTypes.map((t) => (
@@ -213,7 +260,7 @@ export function Documents() {
             onChange={(e) =>
               setFilters((f) => ({ ...f, startDate: e.target.value }))
             }
-            className="border rounded px-3 py-2"
+            className="border border-gray-200 rounded px-3 py-2 text-sm"
             placeholder="Start Date"
           />
 
@@ -223,20 +270,20 @@ export function Documents() {
             onChange={(e) =>
               setFilters((f) => ({ ...f, endDate: e.target.value }))
             }
-            className="border rounded px-3 py-2"
+            className="border border-gray-200 rounded px-3 py-2 text-sm"
             placeholder="End Date"
           />
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center text-gray-500">Loading...</div>
         ) : documents.length === 0 ? (
           <div className="p-8 text-center text-gray-500">No documents found</div>
         ) : (
           <table className="w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 border-b border-gray-100">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
@@ -262,7 +309,7 @@ export function Documents() {
                 </tr>
               ))}
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-gray-100">
               {table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}

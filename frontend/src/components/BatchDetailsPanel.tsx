@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FileText, Store } from 'lucide-react';
 import { fetchBatchDocuments, updateBatchStore } from '../api/client';
 
@@ -28,6 +29,7 @@ interface Props {
 }
 
 export function BatchDetailsPanel({ batchId, stores, onStoreChanged }: Props) {
+  const navigate = useNavigate();
   const [details, setDetails] = useState<BatchDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -133,7 +135,11 @@ export function BatchDetailsPanel({ batchId, stores, onStoreChanged }: Props) {
             </thead>
             <tbody className="divide-y">
               {details.documents.map((doc) => (
-                <tr key={doc.id} className="hover:bg-gray-50">
+                <tr
+                  key={doc.id}
+                  onClick={() => navigate(`/documents/${doc.id}`)}
+                  className="hover:bg-gray-50 cursor-pointer"
+                >
                   <td className="px-3 py-2">{doc.id}</td>
                   <td className="px-3 py-2">
                     {doc.documentType?.name ?? (

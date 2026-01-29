@@ -12,13 +12,13 @@ interface StatCardProps {
 
 function StatCard({ title, value, icon, color }: StatCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="bg-white border border-gray-200 rounded-lg p-5">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-gray-500">{title}</p>
-          <p className="text-2xl font-bold mt-1">{value}</p>
+          <p className="text-2xl font-semibold mt-1 text-gray-900">{value}</p>
         </div>
-        <div className={`p-3 rounded-full ${color}`}>{icon}</div>
+        <div className={`p-2.5 rounded-lg ${color}`}>{icon}</div>
       </div>
     </div>
   );
@@ -75,49 +75,49 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+      <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Documents"
           value={stats.totalDocuments}
-          icon={<FileText className="text-white" size={24} />}
-          color="bg-primary-600"
+          icon={<FileText className="text-gray-600" size={20} />}
+          color="bg-gray-100"
         />
         <StatCard
           title="Total Batches"
           value={stats.totalBatches}
-          icon={<FolderOpen className="text-white" size={24} />}
-          color="bg-blue-500"
+          icon={<FolderOpen className="text-gray-600" size={20} />}
+          color="bg-gray-100"
         />
         <StatCard
           title="Processing Errors"
           value={errorCount}
-          icon={<AlertCircle className="text-white" size={24} />}
-          color={errorCount > 0 ? 'bg-red-500' : 'bg-green-500'}
+          icon={<AlertCircle className={errorCount > 0 ? 'text-red-500' : 'text-gray-600'} size={20} />}
+          color={errorCount > 0 ? 'bg-red-50' : 'bg-gray-100'}
         />
         <StatCard
           title="Active Stores"
           value={storeCount}
-          icon={<Store className="text-white" size={24} />}
-          color="bg-purple-500"
+          icon={<Store className="text-gray-600" size={20} />}
+          color="bg-gray-100"
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-4 border-b">
-            <h2 className="font-semibold">Batches by Type</h2>
+        <div className="bg-white border border-gray-200 rounded-lg">
+          <div className="p-4 border-b border-gray-100">
+            <h2 className="font-medium text-gray-900">Documents by Type</h2>
           </div>
           <div className="p-4">
             {stats.documentsByType.length === 0 ? (
-              <p className="text-gray-500 text-sm">No batches yet</p>
+              <p className="text-gray-500 text-sm">No documents yet</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {stats.documentsByType.map((item) => (
-                  <div key={item.type} className="flex justify-between">
-                    <span className="text-gray-700">{item.type}</span>
-                    <span className="font-medium">{item.count}</span>
+                  <div key={item.type} className="flex justify-between text-sm">
+                    <span className="text-gray-600">{item.type}</span>
+                    <span className="font-medium text-gray-900">{item.count}</span>
                   </div>
                 ))}
               </div>
@@ -125,11 +125,11 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-4 border-b">
-            <h2 className="font-semibold">Recent Batches</h2>
+        <div className="bg-white border border-gray-200 rounded-lg">
+          <div className="p-4 border-b border-gray-100">
+            <h2 className="font-medium text-gray-900">Recent Batches</h2>
           </div>
-          <div className="divide-y">
+          <div className="divide-y divide-gray-100">
             {stats.recentActivity.length === 0 ? (
               <p className="text-gray-500 text-sm p-4">No batches yet</p>
             ) : (
