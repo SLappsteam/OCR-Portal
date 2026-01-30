@@ -163,7 +163,7 @@ function extractStat(text: string): string | null {
 }
 
 function extractZone(text: string): string | null {
-  const match = text.match(/DATE:\s*[\d/]+\s+(\S+)/i);
+  const match = text.match(/ZONE\s*:?\s*(\d+)/i);
   return match?.[1]?.trim() ?? null;
 }
 
