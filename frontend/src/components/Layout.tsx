@@ -37,7 +37,7 @@ export function Layout({ children }: LayoutProps) {
           <img
             src="/logo.png"
             alt="Slumberland"
-            className="h-8 w-auto"
+            className="h-12 w-auto"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
             }}

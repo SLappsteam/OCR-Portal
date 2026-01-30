@@ -9,9 +9,12 @@ import {
   type OnChangeFn,
 } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { ChevronUp, ChevronDown } from 'lucide-react';
 import { docTypeIcons } from './docTypeIcons';
 import type { PageSearchResult } from '../types/extraction';
+import { useTableSettings } from '../hooks/useTableSettings';
+import { PAGE_SEARCH_TABLE_COLUMNS, buildColumnOptions } from './tableColumnConfigs';
+import { ColumnSettingsDropdown } from './ColumnSettingsDropdown';
+import { ResizableHeader } from './ResizableHeader';
 
 interface PageSearchTableProps {
   results: PageSearchResult[];
@@ -20,17 +23,29 @@ interface PageSearchTableProps {
   onRowClick: (documentId: number, pageNumber: number) => void;
 }
 
+const ALWAYS_VISIBLE = ['icon', 'actions'];
+
 export function PageSearchTable({
   results,
   sorting,
   onSortingChange,
   onRowClick,
 }: PageSearchTableProps) {
+  const {
+    columnVisibility,
+    onColumnVisibilityChange,
+    columnSizing,
+    onColumnSizingChange,
+    toggleColumn,
+    resetToDefaults,
+  } = useTableSettings({ storageKey: 'pageSearchTable', alwaysVisibleIds: ALWAYS_VISIBLE });
+
   const columns = useMemo<ColumnDef<PageSearchResult>[]>(
     () => [
       {
         id: 'icon',
         header: '',
+        size: 60,
         cell: ({ row }) => {
           const code = row.original.document_type_code ?? 'UNCLASSIFIED';
           const config = docTypeIcons[code] ?? docTypeIcons['UNCLASSIFIED']!;
@@ -42,17 +57,21 @@ export function PageSearchTable({
           );
         },
         enableSorting: false,
+        enableResizing: false,
       },
       {
+        id: 'store',
         accessorKey: 'store_number',
         header: 'Store',
       },
       {
+        id: 'type',
         accessorKey: 'document_type_name',
         header: 'Type',
         cell: ({ row }) => row.original.document_type_name ?? 'Unclassified',
       },
       {
+        id: 'reference',
         accessorKey: 'document_reference',
         header: 'Reference',
         cell: ({ row }) => (
@@ -62,6 +81,7 @@ export function PageSearchTable({
         ),
       },
       {
+        id: 'page',
         accessorKey: 'page_number',
         header: 'Page',
         cell: ({ row }) => (
@@ -101,6 +121,7 @@ export function PageSearchTable({
         },
       },
       {
+        id: 'scanned',
         accessorKey: 'created_at',
         header: 'Scanned',
         cell: ({ row }) =>
@@ -109,8 +130,10 @@ export function PageSearchTable({
       {
         id: 'actions',
         header: '',
+        size: 50,
         cell: () => <span className="text-gray-300">&rsaquo;</span>,
         enableSorting: false,
+        enableResizing: false,
       },
     ],
     []
@@ -119,52 +142,60 @@ export function PageSearchTable({
   const table = useReactTable({
     data: results,
     columns,
-    state: { sorting },
+    state: { sorting, columnVisibility, columnSizing },
     onSortingChange,
+    onColumnVisibilityChange,
+    onColumnSizingChange,
+    columnResizeMode: 'onChange',
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
+
+  const columnOptions = buildColumnOptions(PAGE_SEARCH_TABLE_COLUMNS, columnVisibility);
 
   if (results.length === 0) {
     return <div className="p-8 text-center text-gray-500">No results found</div>;
   }
 
   return (
-    <table className="w-full">
-      <thead className="bg-gray-50 border-b border-gray-100">
-        {table.getHeaderGroups().map((headerGroup) => (
-          <tr key={headerGroup.id}>
-            {headerGroup.headers.map((header) => (
-              <th
-                key={header.id}
-                className="px-4 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer select-none"
-                onClick={header.column.getToggleSortingHandler()}
-              >
-                <div className="flex items-center gap-1">
-                  {flexRender(header.column.columnDef.header, header.getContext())}
-                  {header.column.getIsSorted() === 'asc' && <ChevronUp size={14} />}
-                  {header.column.getIsSorted() === 'desc' && <ChevronDown size={14} />}
-                </div>
-              </th>
-            ))}
-          </tr>
-        ))}
-      </thead>
-      <tbody className="divide-y divide-gray-100">
-        {table.getRowModel().rows.map((row) => (
-          <tr
-            key={row.id}
-            className="hover:bg-gray-50 cursor-pointer"
-            onClick={() => onRowClick(row.original.document_id, row.original.page_number)}
-          >
-            {row.getVisibleCells().map((cell) => (
-              <td key={cell.id} className="px-4 py-3">
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div>
+      <div className="flex justify-end px-4 py-2 border-b border-gray-100">
+        <ColumnSettingsDropdown
+          columns={columnOptions}
+          onToggle={toggleColumn}
+          onReset={resetToDefaults}
+        />
+      </div>
+      <table className="w-full" style={{ tableLayout: 'fixed' }}>
+        <thead className="bg-gray-50 border-b border-gray-100">
+          {table.getHeaderGroups().map((headerGroup) => (
+            <tr key={headerGroup.id}>
+              {headerGroup.headers.map((header) => (
+                <ResizableHeader key={header.id} header={header} />
+              ))}
+            </tr>
+          ))}
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {table.getRowModel().rows.map((row) => (
+            <tr
+              key={row.id}
+              className="hover:bg-gray-50 cursor-pointer"
+              onClick={() => onRowClick(row.original.document_id, row.original.page_number)}
+            >
+              {row.getVisibleCells().map((cell) => (
+                <td
+                  key={cell.id}
+                  className="px-4 py-3"
+                  style={{ width: cell.column.getSize() }}
+                >
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

@@ -9,8 +9,11 @@ import {
   type OnChangeFn,
 } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { ChevronUp, ChevronDown } from 'lucide-react';
 import { docTypeIcons, type DocumentRow } from './docTypeIcons';
+import { useTableSettings } from '../hooks/useTableSettings';
+import { DOCUMENTS_TABLE_COLUMNS, buildColumnOptions } from './tableColumnConfigs';
+import { ColumnSettingsDropdown } from './ColumnSettingsDropdown';
+import { ResizableHeader } from './ResizableHeader';
 
 interface DocumentsTableProps {
   documents: DocumentRow[];
@@ -19,17 +22,29 @@ interface DocumentsTableProps {
   onRowClick: (id: number) => void;
 }
 
+const ALWAYS_VISIBLE = ['icon', 'actions'];
+
 export function DocumentsTable({
   documents,
   sorting,
   onSortingChange,
   onRowClick,
 }: DocumentsTableProps) {
+  const {
+    columnVisibility,
+    onColumnVisibilityChange,
+    columnSizing,
+    onColumnSizingChange,
+    toggleColumn,
+    resetToDefaults,
+  } = useTableSettings({ storageKey: 'documentsTable', alwaysVisibleIds: ALWAYS_VISIBLE });
+
   const columns = useMemo<ColumnDef<DocumentRow>[]>(
     () => [
       {
         id: 'icon',
         header: '',
+        size: 60,
         cell: ({ row }) => {
           const code = row.original.documentType?.code ?? 'UNCLASSIFIED';
           const config = docTypeIcons[code] ?? docTypeIcons['UNCLASSIFIED']!;
@@ -41,13 +56,16 @@ export function DocumentsTable({
           );
         },
         enableSorting: false,
+        enableResizing: false,
       },
       {
+        id: 'store',
         accessorKey: 'batch.store.store_number',
         header: 'Store',
         cell: ({ row }) => row.original.batch.store.store_number,
       },
       {
+        id: 'documentType',
         accessorKey: 'documentType.name',
         header: 'Document Type',
         cell: ({ row }) => row.original.documentType?.name ?? 'Unclassified',
@@ -59,6 +77,7 @@ export function DocumentsTable({
         cell: ({ row }) => row.original.page_end - row.original.page_start + 1,
       },
       {
+        id: 'reference',
         accessorKey: 'reference',
         header: 'Reference',
         cell: ({ row }) => (
@@ -68,6 +87,7 @@ export function DocumentsTable({
         ),
       },
       {
+        id: 'scannedDate',
         accessorKey: 'created_at',
         header: 'Scanned Date',
         cell: ({ row }) =>
@@ -76,8 +96,10 @@ export function DocumentsTable({
       {
         id: 'actions',
         header: '',
+        size: 50,
         cell: () => <span className="text-gray-300">&rsaquo;</span>,
         enableSorting: false,
+        enableResizing: false,
       },
     ],
     []
@@ -86,52 +108,60 @@ export function DocumentsTable({
   const table = useReactTable({
     data: documents,
     columns,
-    state: { sorting },
+    state: { sorting, columnVisibility, columnSizing },
     onSortingChange,
+    onColumnVisibilityChange,
+    onColumnSizingChange,
+    columnResizeMode: 'onChange',
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
+
+  const columnOptions = buildColumnOptions(DOCUMENTS_TABLE_COLUMNS, columnVisibility);
 
   if (documents.length === 0) {
     return <div className="p-8 text-center text-gray-500">No documents found</div>;
   }
 
   return (
-    <table className="w-full">
-      <thead className="bg-gray-50 border-b border-gray-100">
-        {table.getHeaderGroups().map((headerGroup) => (
-          <tr key={headerGroup.id}>
-            {headerGroup.headers.map((header) => (
-              <th
-                key={header.id}
-                className="px-4 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer select-none"
-                onClick={header.column.getToggleSortingHandler()}
-              >
-                <div className="flex items-center gap-1">
-                  {flexRender(header.column.columnDef.header, header.getContext())}
-                  {header.column.getIsSorted() === 'asc' && <ChevronUp size={14} />}
-                  {header.column.getIsSorted() === 'desc' && <ChevronDown size={14} />}
-                </div>
-              </th>
-            ))}
-          </tr>
-        ))}
-      </thead>
-      <tbody className="divide-y divide-gray-100">
-        {table.getRowModel().rows.map((row) => (
-          <tr
-            key={row.id}
-            className="hover:bg-gray-50 cursor-pointer"
-            onClick={() => onRowClick(row.original.id)}
-          >
-            {row.getVisibleCells().map((cell) => (
-              <td key={cell.id} className="px-4 py-3">
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div>
+      <div className="flex justify-end px-4 py-2 border-b border-gray-100">
+        <ColumnSettingsDropdown
+          columns={columnOptions}
+          onToggle={toggleColumn}
+          onReset={resetToDefaults}
+        />
+      </div>
+      <table className="w-full" style={{ tableLayout: 'fixed' }}>
+        <thead className="bg-gray-50 border-b border-gray-100">
+          {table.getHeaderGroups().map((headerGroup) => (
+            <tr key={headerGroup.id}>
+              {headerGroup.headers.map((header) => (
+                <ResizableHeader key={header.id} header={header} />
+              ))}
+            </tr>
+          ))}
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {table.getRowModel().rows.map((row) => (
+            <tr
+              key={row.id}
+              className="hover:bg-gray-50 cursor-pointer"
+              onClick={() => onRowClick(row.original.id)}
+            >
+              {row.getVisibleCells().map((cell) => (
+                <td
+                  key={cell.id}
+                  className="px-4 py-3"
+                  style={{ width: cell.column.getSize() }}
+                >
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
