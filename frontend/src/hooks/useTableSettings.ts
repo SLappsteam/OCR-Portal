@@ -36,6 +36,26 @@ function buildDefaultVisibility(hidden?: string[]): VisibilityState {
   return vis;
 }
 
+function mergeStoredOrder(stored: string[], defaultOrder: string[]): string[] {
+  const existing = new Set(stored);
+  const newIds = defaultOrder.filter((id) => !existing.has(id));
+  return [...stored, ...newIds];
+}
+
+function mergeStoredVisibility(
+  stored: VisibilityState,
+  defaultHidden?: string[],
+): VisibilityState {
+  if (!defaultHidden || defaultHidden.length === 0) return stored;
+  const merged = { ...stored };
+  for (const id of defaultHidden) {
+    if (!(id in merged)) {
+      merged[id] = false;
+    }
+  }
+  return merged;
+}
+
 export function useTableSettings({
   storageKey,
   alwaysVisibleIds,
@@ -45,13 +65,15 @@ export function useTableSettings({
   const stored = loadSettings(storageKey);
 
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
-    stored?.visibility ?? buildDefaultVisibility(defaultHidden),
+    stored
+      ? mergeStoredVisibility(stored.visibility, defaultHidden)
+      : buildDefaultVisibility(defaultHidden),
   );
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(
     stored?.sizing ?? {},
   );
   const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(
-    stored?.order ?? defaultOrder,
+    stored?.order ? mergeStoredOrder(stored.order, defaultOrder) : defaultOrder,
   );
 
   const persist = useCallback(
@@ -113,11 +135,12 @@ export function useTableSettings({
   );
 
   const resetToDefaults = useCallback(() => {
-    setColumnVisibility({});
+    const vis = buildDefaultVisibility(defaultHidden);
+    setColumnVisibility(vis);
     setColumnSizing({});
     setColumnOrder(defaultOrder);
-    localStorage.removeItem(`table-settings-${storageKey}`);
-  }, [storageKey, defaultOrder]);
+    saveSettings(storageKey, { visibility: vis, sizing: {}, order: defaultOrder });
+  }, [storageKey, defaultOrder, defaultHidden]);
 
   return {
     columnVisibility,
