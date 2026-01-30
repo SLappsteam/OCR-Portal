@@ -10,7 +10,7 @@ import { PageExtractionResult } from './types';
 import { logger } from '../../utils/logger';
 
 const SUPPORTED_DOC_TYPES = ['FINSALES'];
-const LOW_CONFIDENCE_THRESHOLD = 20;
+const LOW_CONFIDENCE_THRESHOLD = 50;
 
 export async function extractAllPages(
   filePath: string,

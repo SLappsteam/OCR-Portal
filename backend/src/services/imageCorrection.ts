@@ -2,7 +2,7 @@ import sharp from 'sharp';
 import Tesseract from 'tesseract.js';
 import { logger } from '../utils/logger';
 
-const ORIENTATION_CONFIDENCE_THRESHOLD = 15;
+const ORIENTATION_CONFIDENCE_THRESHOLD = 10;
 const DESKEW_ANGLE_THRESHOLD = 0.5;
 const MAX_DESKEW_ANGLE = 10;
 
