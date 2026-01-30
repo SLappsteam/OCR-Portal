@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { parseFinsalesPage, calculateConfidence } from '../src/services/extraction/finsalesParser';
 import { parseSummaryText, isSummaryPage } from '../src/services/extraction/summaryParser';
+import { isTicketPage, parseTicketText, calculateTicketConfidence } from '../src/services/extraction/ticketParser';
 
 const prisma = new PrismaClient();
 
@@ -18,22 +19,26 @@ async function main() {
     const docType = ext.document.documentType?.code ?? '';
     if (docType !== 'FINSALES') continue;
 
-    let fields: Record<string, unknown>;
+    let fields: unknown;
     let confidence: number;
 
     if (isSummaryPage(ext.raw_text)) {
       const orders = parseSummaryText(ext.raw_text);
       fields = { orders };
       confidence = Math.min(orders.length / 5, 1);
+    } else if (isTicketPage(ext.raw_text)) {
+      const parsed = parseTicketText(ext.raw_text);
+      fields = parsed;
+      confidence = calculateTicketConfidence(parsed);
     } else {
       const parsed = parseFinsalesPage(ext.raw_text);
-      fields = parsed as Record<string, unknown>;
+      fields = parsed;
       confidence = calculateConfidence(parsed);
     }
 
     await prisma.pageExtraction.update({
       where: { id: ext.id },
-      data: { fields, confidence },
+      data: { fields: fields as never, confidence },
     });
     updated++;
   }

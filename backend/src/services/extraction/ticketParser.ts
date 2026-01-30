@@ -1,7 +1,7 @@
 import { FinsalesData } from './types';
 import { uppercaseFields } from './headerParser';
 
-const TICKET_PATTERN = /\*\s*(DELIVERY|RETURN)\s+TICKET\s*\*/i;
+const TICKET_PATTERN = /(DELIVERY|RETURN)\s+TIC\w*ET/i;
 const ORDER_ID_PATTERN = /(?:Order|Return)\s+ID:\s*(\S+)/i;
 const CUSTOMER_ID_PATTERN = /Customer\s+ID:\s*(\S+)/i;
 const DELIVERY_DATE_PATTERN = /Delivery\s+Date:\s*([\d/]+)/i;
