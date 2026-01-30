@@ -22,6 +22,8 @@ export interface FinsalesFields {
   zone?: string;
   fulfillment_type?: string;
   customer_code?: string;
+  finance_company?: string;
+  financed_amount?: string;
 }
 
 export interface PageExtractionRecord {

@@ -22,6 +22,8 @@ const FIELD_LABELS: Record<string, string> = {
   zone: 'Zone',
   fulfillment_type: 'Fulfillment Type',
   customer_code: 'C. Code',
+  finance_company: 'Finance Co.',
+  financed_amount: 'Financed Amt.',
 };
 
 export function ExtractionFields({ fields }: ExtractionFieldsProps) {

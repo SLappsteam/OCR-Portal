@@ -1,5 +1,5 @@
 import { FinsalesData } from './types';
-import { uppercaseFields } from './finsalesParser';
+import { uppercaseFields } from './headerParser';
 
 const TICKET_PATTERN = /\*\s*(DELIVERY|RETURN)\s+TICKET\s*\*/i;
 const ORDER_ID_PATTERN = /(?:Order|Return)\s+ID:\s*(\S+)/i;
@@ -33,6 +33,8 @@ export function parseTicketText(rawText: string): FinsalesData {
     zone: null,
     fulfillment_type: null,
     customer_code: null,
+    finance_company: null,
+    financed_amount: null,
   });
 }
 

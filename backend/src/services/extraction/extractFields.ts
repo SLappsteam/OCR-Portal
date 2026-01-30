@@ -2,7 +2,7 @@ import sharp from 'sharp';
 import Tesseract from 'tesseract.js';
 import { extractPageAsPng } from '../tiffService';
 import { correctPageImage } from '../imageCorrection';
-import { parseFinsalesText, calculateConfidence } from './finsalesParser';
+import { parseFinsalesPage, calculateConfidence } from './finsalesParser';
 import { parseSummaryText, isSummaryPage } from './summaryParser';
 import { isTicketPage, parseTicketText, calculateTicketConfidence } from './ticketParser';
 import { scanBarcodeInRegion } from '../barcodeService';
@@ -116,7 +116,7 @@ function buildDetailResult(
   pageNumber: number,
   docTypeCode: string
 ): PageExtractionResult {
-  const fields = parseFinsalesText(rawText);
+  const fields = parseFinsalesPage(rawText);
   const confidence = calculateConfidence(fields);
 
   logger.info(

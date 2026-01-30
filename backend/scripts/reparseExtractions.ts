@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { parseFinsalesText, calculateConfidence } from '../src/services/extraction/finsalesParser';
+import { parseFinsalesPage, calculateConfidence } from '../src/services/extraction/finsalesParser';
 import { parseSummaryText, isSummaryPage } from '../src/services/extraction/summaryParser';
 
 const prisma = new PrismaClient();
@@ -26,7 +26,7 @@ async function main() {
       fields = { orders };
       confidence = Math.min(orders.length / 5, 1);
     } else {
-      const parsed = parseFinsalesText(ext.raw_text);
+      const parsed = parseFinsalesPage(ext.raw_text);
       fields = parsed as Record<string, unknown>;
       confidence = calculateConfidence(parsed);
     }

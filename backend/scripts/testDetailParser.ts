@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { parseFinsalesText, calculateConfidence } from '../src/services/extraction/finsalesParser';
+import { parseFinsalesPage, calculateConfidence } from '../src/services/extraction/finsalesParser';
 
 const prisma = new PrismaClient();
 
@@ -11,7 +11,7 @@ async function main() {
 
   for (const ext of extractions) {
     console.log(`\n=== Page ${ext.page_number} ===`);
-    const fields = parseFinsalesText(ext.raw_text);
+    const fields = parseFinsalesPage(ext.raw_text);
     const conf = calculateConfidence(fields);
     console.log(`Confidence: ${(conf * 100).toFixed(0)}%`);
     for (const [k, v] of Object.entries(fields)) {

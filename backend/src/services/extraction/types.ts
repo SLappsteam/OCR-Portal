@@ -15,6 +15,8 @@ export interface FinsalesData {
   zone: string | null;
   fulfillment_type: string | null;
   customer_code: string | null;
+  finance_company: string | null;
+  financed_amount: string | null;
 }
 
 export interface ExtractionResult {
