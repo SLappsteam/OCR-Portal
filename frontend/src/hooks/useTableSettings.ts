@@ -1,14 +1,16 @@
 import { useState, useCallback } from 'react';
-import type { VisibilityState, ColumnSizingState } from '@tanstack/react-table';
+import type { VisibilityState, ColumnSizingState, ColumnOrderState } from '@tanstack/react-table';
 
 interface StoredSettings {
   visibility: VisibilityState;
   sizing: ColumnSizingState;
+  order: ColumnOrderState;
 }
 
 interface UseTableSettingsOptions {
   storageKey: string;
   alwaysVisibleIds: string[];
+  defaultOrder: string[];
 }
 
 function loadSettings(key: string): StoredSettings | null {
@@ -24,7 +26,11 @@ function saveSettings(key: string, settings: StoredSettings) {
   localStorage.setItem(`table-settings-${key}`, JSON.stringify(settings));
 }
 
-export function useTableSettings({ storageKey, alwaysVisibleIds }: UseTableSettingsOptions) {
+export function useTableSettings({
+  storageKey,
+  alwaysVisibleIds,
+  defaultOrder,
+}: UseTableSettingsOptions) {
   const stored = loadSettings(storageKey);
 
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
@@ -33,27 +39,48 @@ export function useTableSettings({ storageKey, alwaysVisibleIds }: UseTableSetti
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(
     stored?.sizing ?? {},
   );
+  const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(
+    stored?.order ?? defaultOrder,
+  );
+
+  const persist = useCallback(
+    (vis: VisibilityState, siz: ColumnSizingState, ord: ColumnOrderState) => {
+      saveSettings(storageKey, { visibility: vis, sizing: siz, order: ord });
+    },
+    [storageKey],
+  );
 
   const onColumnVisibilityChange = useCallback(
     (updater: VisibilityState | ((prev: VisibilityState) => VisibilityState)) => {
       setColumnVisibility((prev) => {
         const next = typeof updater === 'function' ? updater(prev) : updater;
-        saveSettings(storageKey, { visibility: next, sizing: columnSizing });
+        persist(next, columnSizing, columnOrder);
         return next;
       });
     },
-    [storageKey, columnSizing],
+    [persist, columnSizing, columnOrder],
   );
 
   const onColumnSizingChange = useCallback(
     (updater: ColumnSizingState | ((prev: ColumnSizingState) => ColumnSizingState)) => {
       setColumnSizing((prev) => {
         const next = typeof updater === 'function' ? updater(prev) : updater;
-        saveSettings(storageKey, { visibility: columnVisibility, sizing: next });
+        persist(columnVisibility, next, columnOrder);
         return next;
       });
     },
-    [storageKey, columnVisibility],
+    [persist, columnVisibility, columnOrder],
+  );
+
+  const onColumnOrderChange = useCallback(
+    (updater: ColumnOrderState | ((prev: ColumnOrderState) => ColumnOrderState)) => {
+      setColumnOrder((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        persist(columnVisibility, columnSizing, next);
+        return next;
+      });
+    },
+    [persist, columnVisibility, columnSizing],
   );
 
   const toggleColumn = useCallback(
@@ -67,18 +94,29 @@ export function useTableSettings({ storageKey, alwaysVisibleIds }: UseTableSetti
     [alwaysVisibleIds, onColumnVisibilityChange],
   );
 
+  const reorderColumns = useCallback(
+    (newOrder: string[]) => {
+      onColumnOrderChange(newOrder);
+    },
+    [onColumnOrderChange],
+  );
+
   const resetToDefaults = useCallback(() => {
     setColumnVisibility({});
     setColumnSizing({});
+    setColumnOrder(defaultOrder);
     localStorage.removeItem(`table-settings-${storageKey}`);
-  }, [storageKey]);
+  }, [storageKey, defaultOrder]);
 
   return {
     columnVisibility,
     onColumnVisibilityChange,
     columnSizing,
     onColumnSizingChange,
+    columnOrder,
+    onColumnOrderChange,
     toggleColumn,
+    reorderColumns,
     resetToDefaults,
   };
 }

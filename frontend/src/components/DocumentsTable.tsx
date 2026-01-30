@@ -11,7 +11,7 @@ import {
 import { format } from 'date-fns';
 import { docTypeIcons, type DocumentRow } from './docTypeIcons';
 import { useTableSettings } from '../hooks/useTableSettings';
-import { DOCUMENTS_TABLE_COLUMNS, buildColumnOptions } from './tableColumnConfigs';
+import { DOCUMENTS_TABLE_COLUMNS, DOCUMENTS_DEFAULT_ORDER, buildColumnOptions } from './tableColumnConfigs';
 import { ColumnSettingsDropdown } from './ColumnSettingsDropdown';
 import { ResizableHeader } from './ResizableHeader';
 
@@ -22,7 +22,7 @@ interface DocumentsTableProps {
   onRowClick: (id: number) => void;
 }
 
-const ALWAYS_VISIBLE = ['icon', 'actions'];
+const ALWAYS_VISIBLE: string[] = [];
 
 export function DocumentsTable({
   documents,
@@ -35,40 +35,38 @@ export function DocumentsTable({
     onColumnVisibilityChange,
     columnSizing,
     onColumnSizingChange,
+    columnOrder,
+    onColumnOrderChange,
     toggleColumn,
+    reorderColumns,
     resetToDefaults,
-  } = useTableSettings({ storageKey: 'documentsTable', alwaysVisibleIds: ALWAYS_VISIBLE });
+  } = useTableSettings({ storageKey: 'documentsTable', alwaysVisibleIds: ALWAYS_VISIBLE, defaultOrder: DOCUMENTS_DEFAULT_ORDER });
 
   const columns = useMemo<ColumnDef<DocumentRow>[]>(
     () => [
       {
-        id: 'icon',
-        header: '',
-        size: 60,
+        id: 'documentType',
+        accessorKey: 'documentType.name',
+        header: 'Document Type',
         cell: ({ row }) => {
           const code = row.original.documentType?.code ?? 'UNCLASSIFIED';
           const config = docTypeIcons[code] ?? docTypeIcons['UNCLASSIFIED']!;
           const Icon = config!.icon;
           return (
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${config!.color}`}>
-              <Icon size={20} />
+            <div className="flex items-center gap-3">
+              <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center ${config!.color}`}>
+                <Icon size={16} />
+              </div>
+              <span>{row.original.documentType?.name ?? 'Unclassified'}</span>
             </div>
           );
         },
-        enableSorting: false,
-        enableResizing: false,
       },
       {
         id: 'store',
         accessorKey: 'batch.store.store_number',
         header: 'Store',
         cell: ({ row }) => row.original.batch.store.store_number,
-      },
-      {
-        id: 'documentType',
-        accessorKey: 'documentType.name',
-        header: 'Document Type',
-        cell: ({ row }) => row.original.documentType?.name ?? 'Unclassified',
       },
       {
         id: 'pages',
@@ -93,14 +91,6 @@ export function DocumentsTable({
         cell: ({ row }) =>
           format(new Date(row.original.created_at), 'MMM d, yyyy'),
       },
-      {
-        id: 'actions',
-        header: '',
-        size: 50,
-        cell: () => <span className="text-gray-300">&rsaquo;</span>,
-        enableSorting: false,
-        enableResizing: false,
-      },
     ],
     []
   );
@@ -108,16 +98,17 @@ export function DocumentsTable({
   const table = useReactTable({
     data: documents,
     columns,
-    state: { sorting, columnVisibility, columnSizing },
+    state: { sorting, columnVisibility, columnSizing, columnOrder },
     onSortingChange,
     onColumnVisibilityChange,
     onColumnSizingChange,
+    onColumnOrderChange,
     columnResizeMode: 'onChange',
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
 
-  const columnOptions = buildColumnOptions(DOCUMENTS_TABLE_COLUMNS, columnVisibility);
+  const columnOptions = buildColumnOptions(DOCUMENTS_TABLE_COLUMNS, columnVisibility, columnOrder);
 
   if (documents.length === 0) {
     return <div className="p-8 text-center text-gray-500">No documents found</div>;
@@ -129,6 +120,7 @@ export function DocumentsTable({
         <ColumnSettingsDropdown
           columns={columnOptions}
           onToggle={toggleColumn}
+          onReorder={reorderColumns}
           onReset={resetToDefaults}
         />
       </div>

@@ -12,7 +12,7 @@ import { format } from 'date-fns';
 import { docTypeIcons } from './docTypeIcons';
 import type { PageSearchResult } from '../types/extraction';
 import { useTableSettings } from '../hooks/useTableSettings';
-import { PAGE_SEARCH_TABLE_COLUMNS, buildColumnOptions } from './tableColumnConfigs';
+import { PAGE_SEARCH_TABLE_COLUMNS, PAGE_SEARCH_DEFAULT_ORDER, buildColumnOptions } from './tableColumnConfigs';
 import { ColumnSettingsDropdown } from './ColumnSettingsDropdown';
 import { ResizableHeader } from './ResizableHeader';
 
@@ -23,7 +23,7 @@ interface PageSearchTableProps {
   onRowClick: (documentId: number, pageNumber: number) => void;
 }
 
-const ALWAYS_VISIBLE = ['icon', 'actions'];
+const ALWAYS_VISIBLE: string[] = [];
 
 export function PageSearchTable({
   results,
@@ -36,39 +36,37 @@ export function PageSearchTable({
     onColumnVisibilityChange,
     columnSizing,
     onColumnSizingChange,
+    columnOrder,
+    onColumnOrderChange,
     toggleColumn,
+    reorderColumns,
     resetToDefaults,
-  } = useTableSettings({ storageKey: 'pageSearchTable', alwaysVisibleIds: ALWAYS_VISIBLE });
+  } = useTableSettings({ storageKey: 'pageSearchTable', alwaysVisibleIds: ALWAYS_VISIBLE, defaultOrder: PAGE_SEARCH_DEFAULT_ORDER });
 
   const columns = useMemo<ColumnDef<PageSearchResult>[]>(
     () => [
       {
-        id: 'icon',
-        header: '',
-        size: 60,
+        id: 'type',
+        accessorKey: 'document_type_name',
+        header: 'Type',
         cell: ({ row }) => {
           const code = row.original.document_type_code ?? 'UNCLASSIFIED';
           const config = docTypeIcons[code] ?? docTypeIcons['UNCLASSIFIED']!;
           const Icon = config!.icon;
           return (
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${config!.color}`}>
-              <Icon size={20} />
+            <div className="flex items-center gap-3">
+              <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center ${config!.color}`}>
+                <Icon size={16} />
+              </div>
+              <span>{row.original.document_type_name ?? 'Unclassified'}</span>
             </div>
           );
         },
-        enableSorting: false,
-        enableResizing: false,
       },
       {
         id: 'store',
         accessorKey: 'store_number',
         header: 'Store',
-      },
-      {
-        id: 'type',
-        accessorKey: 'document_type_name',
-        header: 'Type',
-        cell: ({ row }) => row.original.document_type_name ?? 'Unclassified',
       },
       {
         id: 'reference',
@@ -127,14 +125,6 @@ export function PageSearchTable({
         cell: ({ row }) =>
           format(new Date(row.original.created_at), 'MMM d, yyyy'),
       },
-      {
-        id: 'actions',
-        header: '',
-        size: 50,
-        cell: () => <span className="text-gray-300">&rsaquo;</span>,
-        enableSorting: false,
-        enableResizing: false,
-      },
     ],
     []
   );
@@ -142,16 +132,17 @@ export function PageSearchTable({
   const table = useReactTable({
     data: results,
     columns,
-    state: { sorting, columnVisibility, columnSizing },
+    state: { sorting, columnVisibility, columnSizing, columnOrder },
     onSortingChange,
     onColumnVisibilityChange,
     onColumnSizingChange,
+    onColumnOrderChange,
     columnResizeMode: 'onChange',
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
 
-  const columnOptions = buildColumnOptions(PAGE_SEARCH_TABLE_COLUMNS, columnVisibility);
+  const columnOptions = buildColumnOptions(PAGE_SEARCH_TABLE_COLUMNS, columnVisibility, columnOrder);
 
   if (results.length === 0) {
     return <div className="p-8 text-center text-gray-500">No results found</div>;
@@ -163,6 +154,7 @@ export function PageSearchTable({
         <ColumnSettingsDropdown
           columns={columnOptions}
           onToggle={toggleColumn}
+          onReorder={reorderColumns}
           onReset={resetToDefaults}
         />
       </div>
