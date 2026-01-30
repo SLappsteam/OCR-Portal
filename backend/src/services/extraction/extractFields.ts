@@ -1,7 +1,7 @@
 import sharp from 'sharp';
-import Tesseract from 'tesseract.js';
 import { extractPageAsPng } from '../tiffService';
 import { correctPageImage } from '../imageCorrection';
+import { ocrRecognize } from '../ocrPool';
 import { parseFinsalesPage, calculateConfidence } from './finsalesParser';
 import { parseSummaryText, isSummaryPage } from './summaryParser';
 import { isTicketPage, parseTicketText, calculateTicketConfidence } from './ticketParser';
@@ -11,6 +11,7 @@ import { logger } from '../../utils/logger';
 
 const SUPPORTED_DOC_TYPES = ['FINSALES'];
 const LOW_CONFIDENCE_THRESHOLD = 50;
+const PAGE_CONCURRENCY = 4;
 
 export async function extractAllPages(
   filePath: string,
@@ -22,15 +23,22 @@ export async function extractAllPages(
     return [];
   }
 
-  const results: PageExtractionResult[] = [];
-
+  const pageNumbers: number[] = [];
   for (let page = pageStart + 1; page <= pageEnd; page++) {
-    const isSummaryCandidate = page === pageStart + 1;
-    const result = await extractSinglePage(
-      filePath, page, docTypeCode, isSummaryCandidate
+    pageNumbers.push(page);
+  }
+
+  const results: PageExtractionResult[] = [];
+  for (let i = 0; i < pageNumbers.length; i += PAGE_CONCURRENCY) {
+    const batch = pageNumbers.slice(i, i + PAGE_CONCURRENCY);
+    const batchResults = await Promise.all(
+      batch.map((page) => {
+        const isSummary = page === pageStart + 1;
+        return extractSinglePage(filePath, page, docTypeCode, isSummary);
+      })
     );
-    if (result) {
-      results.push(result);
+    for (const r of batchResults) {
+      if (r) results.push(r);
     }
   }
 
@@ -163,17 +171,13 @@ async function tryExtractTicket(
 }
 
 async function ocrPage(imageBuffer: Buffer): Promise<string> {
-  const result = await Tesseract.recognize(imageBuffer, 'eng', {
-    logger: () => {},
-  });
+  const result = await ocrRecognize(imageBuffer);
   return result.data.text;
 }
 
 async function ocrPageWithConfidence(
   imageBuffer: Buffer
 ): Promise<{ text: string; confidence: number }> {
-  const result = await Tesseract.recognize(imageBuffer, 'eng', {
-    logger: () => {},
-  });
+  const result = await ocrRecognize(imageBuffer);
   return { text: result.data.text, confidence: result.data.confidence };
 }

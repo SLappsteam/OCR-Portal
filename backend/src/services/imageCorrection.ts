@@ -1,23 +1,19 @@
 import sharp from 'sharp';
 import Tesseract from 'tesseract.js';
 import { logger } from '../utils/logger';
+import { ocrRecognize } from './ocrPool';
 
 const ORIENTATION_CONFIDENCE_THRESHOLD = 10;
 const DESKEW_ANGLE_THRESHOLD = 0.5;
 const MAX_DESKEW_ANGLE = 10;
 
-interface OrientationResult {
-  rotation: number;
-  confidence: number;
-}
-
-async function sampleRegion(imageBuffer: Buffer): Promise<Buffer> {
+async function sampleUnifiedRegion(imageBuffer: Buffer): Promise<Buffer> {
   const metadata = await sharp(imageBuffer).metadata();
   const width = metadata.width ?? 1700;
   const height = metadata.height ?? 2200;
 
-  const sampleTop = Math.floor(height * 0.25);
-  const sampleHeight = Math.floor(height * 0.3);
+  const sampleTop = Math.floor(height * 0.2);
+  const sampleHeight = Math.floor(height * 0.35);
 
   return sharp(imageBuffer)
     .extract({ left: 0, top: sampleTop, width, height: sampleHeight })
@@ -25,46 +21,6 @@ async function sampleRegion(imageBuffer: Buffer): Promise<Buffer> {
     .normalize()
     .png()
     .toBuffer();
-}
-
-async function ocrWithConfidence(
-  imageBuffer: Buffer
-): Promise<{ confidence: number; rotateRadians: number | null }> {
-  const result = await Tesseract.recognize(imageBuffer, 'eng', {
-    logger: () => {},
-  });
-  return {
-    confidence: result.data.confidence,
-    rotateRadians: result.data.rotateRadians,
-  };
-}
-
-export async function detectOrientation(
-  imageBuffer: Buffer
-): Promise<OrientationResult> {
-  try {
-    const sample = await sampleRegion(imageBuffer);
-    const normal = await ocrWithConfidence(sample);
-
-    if (normal.confidence > 70) {
-      return { rotation: 0, confidence: normal.confidence };
-    }
-
-    const rotated180 = await sharp(sample).rotate(180).png().toBuffer();
-    const flipped = await ocrWithConfidence(rotated180);
-
-    if (flipped.confidence > normal.confidence + ORIENTATION_CONFIDENCE_THRESHOLD) {
-      logger.info(
-        `Page upside-down: conf ${normal.confidence.toFixed(1)} vs rotated ${flipped.confidence.toFixed(1)}`
-      );
-      return { rotation: 180, confidence: flipped.confidence };
-    }
-
-    return { rotation: 0, confidence: normal.confidence };
-  } catch (error) {
-    logger.debug('Orientation detection failed, using default', error);
-    return { rotation: 0, confidence: 0 };
-  }
 }
 
 function extractLinesFromBlocks(
@@ -103,59 +59,48 @@ function calculateSkewFromLines(lines: Tesseract.Line[]): number {
   return angles.reduce((sum, a) => sum + a.angle * a.weight, 0) / totalWeight;
 }
 
-export async function detectSkewAngle(
+export async function correctPageImage(
   imageBuffer: Buffer
-): Promise<number> {
+): Promise<Buffer> {
   try {
-    const metadata = await sharp(imageBuffer).metadata();
-    const width = metadata.width ?? 1700;
-    const height = metadata.height ?? 2200;
+    const sample = await sampleUnifiedRegion(imageBuffer);
+    const normalResult = await ocrRecognize(sample);
 
-    const sampleTop = Math.floor(height * 0.2);
-    const sampleHeight = Math.floor(height * 0.5);
+    let rotation = 0;
+    let skewBlocks = normalResult.data.blocks;
 
-    const sample = await sharp(imageBuffer)
-      .extract({ left: 0, top: sampleTop, width, height: sampleHeight })
-      .grayscale()
-      .normalize()
-      .png()
-      .toBuffer();
+    if (normalResult.data.confidence <= 70) {
+      const rotated180 = await sharp(sample).rotate(180).png().toBuffer();
+      const flippedResult = await ocrRecognize(rotated180);
 
-    const result = await Tesseract.recognize(sample, 'eng', {
-      logger: () => {},
-    });
+      if (flippedResult.data.confidence > normalResult.data.confidence + ORIENTATION_CONFIDENCE_THRESHOLD) {
+        logger.info(
+          `Page upside-down: conf ${normalResult.data.confidence.toFixed(1)} vs rotated ${flippedResult.data.confidence.toFixed(1)}`
+        );
+        rotation = 180;
+        skewBlocks = flippedResult.data.blocks;
+      }
+    }
 
-    const lines = extractLinesFromBlocks(result.data.blocks);
+    let corrected = imageBuffer;
+    if (rotation !== 0) {
+      corrected = await sharp(corrected).rotate(rotation).png().toBuffer();
+    }
+
+    const lines = extractLinesFromBlocks(skewBlocks);
     const skew = calculateSkewFromLines(lines);
 
     if (Math.abs(skew) > DESKEW_ANGLE_THRESHOLD) {
       logger.info(`Skew detected: ${skew.toFixed(2)} degrees`);
+      corrected = await sharp(corrected)
+        .rotate(-skew, { background: { r: 255, g: 255, b: 255 } })
+        .png()
+        .toBuffer();
     }
 
-    return skew;
+    return corrected;
   } catch (error) {
-    logger.debug('Skew detection failed', error);
-    return 0;
+    logger.debug('Image correction failed, returning original', error);
+    return imageBuffer;
   }
-}
-
-export async function correctPageImage(
-  imageBuffer: Buffer
-): Promise<Buffer> {
-  const { rotation } = await detectOrientation(imageBuffer);
-
-  let corrected = imageBuffer;
-  if (rotation !== 0) {
-    corrected = await sharp(corrected).rotate(rotation).png().toBuffer();
-  }
-
-  const skewAngle = await detectSkewAngle(corrected);
-  if (Math.abs(skewAngle) > DESKEW_ANGLE_THRESHOLD) {
-    corrected = await sharp(corrected)
-      .rotate(-skewAngle, { background: { r: 255, g: 255, b: 255 } })
-      .png()
-      .toBuffer();
-  }
-
-  return corrected;
 }

@@ -1,7 +1,7 @@
 import sharp from 'sharp';
-import Tesseract from 'tesseract.js';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/logger';
+import { ocrRecognize } from './ocrPool';
 
 const prisma = new PrismaClient();
 
@@ -79,9 +79,7 @@ async function detectBarcodeWithOCR(
       .png()
       .toBuffer();
 
-    const result = await Tesseract.recognize(cropped, 'eng', {
-      logger: () => {},
-    });
+    const result = await ocrRecognize(cropped);
 
     const rawText = result.data.text.trim();
     const match = rawText.match(BARCODE_TEXT_PATTERN);

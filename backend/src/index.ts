@@ -9,6 +9,7 @@ import { routes } from './routes';
 import { startWatcher, stopWatcher } from './services/watcherService';
 import { ensureStorageDirectories } from './services/storageService';
 import { acquireLock, releaseLock } from './utils/processLock';
+import { shutdownOcrPool } from './services/ocrPool';
 
 dotenv.config();
 
@@ -34,10 +35,11 @@ async function startup(): Promise<void> {
   startWatcher(WATCH_FOLDER_PATH);
 }
 
-function shutdown(): void {
+async function shutdown(): Promise<void> {
   logger.info('Shutting down gracefully...');
   releaseLock();
   stopWatcher();
+  await shutdownOcrPool();
 
   if (server) {
     server.close(() => {
