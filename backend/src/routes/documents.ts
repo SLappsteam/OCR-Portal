@@ -53,13 +53,22 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
           include: { store: true },
         },
         documentType: true,
+        pageExtractions: {
+          orderBy: { page_number: 'asc' },
+          take: 1,
+          select: { fields: true },
+        },
       },
       orderBy: { created_at: 'desc' },
     });
 
-    const serialized = documents.map((d) =>
-      serializeDocument(d as unknown as Record<string, unknown>)
-    );
+    const serialized = documents.map((d) => {
+      const raw = serializeDocument(d as unknown as Record<string, unknown>);
+      const extractions = raw['pageExtractions'] as { fields: unknown }[] | undefined;
+      raw['extraction_fields'] = extractions?.[0]?.fields ?? null;
+      delete raw['pageExtractions'];
+      return raw;
+    });
     const response: ApiResponse = { success: true, data: serialized };
     res.json(response);
   } catch (error) {

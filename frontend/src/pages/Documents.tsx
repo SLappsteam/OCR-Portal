@@ -116,7 +116,7 @@ export function Documents() {
             documents={documents}
             sorting={sorting}
             onSortingChange={setSorting}
-            onRowClick={(id) => navigate(`/documents/${id}`)}
+            onPageClick={handlePageResultClick}
           />
         )}
       </div>

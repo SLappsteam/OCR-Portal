@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { Fragment, useMemo, useState, useCallback } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -9,27 +9,45 @@ import {
   type OnChangeFn,
 } from '@tanstack/react-table';
 import { format } from 'date-fns';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { docTypeIcons, type DocumentRow } from './docTypeIcons';
 import { useTableSettings } from '../hooks/useTableSettings';
 import { DOCUMENTS_TABLE_COLUMNS, DOCUMENTS_DEFAULT_ORDER, buildColumnOptions } from './tableColumnConfigs';
 import { ColumnSettingsDropdown } from './ColumnSettingsDropdown';
 import { ResizableHeader } from './ResizableHeader';
+import { DocumentExpandedRows } from './DocumentExpandedRows';
 
 interface DocumentsTableProps {
   documents: DocumentRow[];
   sorting: SortingState;
   onSortingChange: OnChangeFn<SortingState>;
-  onRowClick: (id: number) => void;
+  onPageClick: (documentId: number, pageNumber: number) => void;
 }
 
 const ALWAYS_VISIBLE: string[] = [];
+const DEFAULT_HIDDEN = [
+  'customer', 'order', 'orderType', 'phone', 'salesperson',
+  'stat', 'zone', 'fulfillmentType', 'customerCode',
+];
+
+function docFieldCell(row: DocumentRow, key: string) {
+  const val = row.extraction_fields?.[key];
+  return val
+    ? <span className="text-sm">{val}</span>
+    : <span className="text-gray-400">-</span>;
+}
 
 export function DocumentsTable({
   documents,
   sorting,
   onSortingChange,
-  onRowClick,
+  onPageClick,
 }: DocumentsTableProps) {
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const toggleExpanded = useCallback((id: number) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  }, []);
   const {
     columnVisibility,
     onColumnVisibilityChange,
@@ -40,7 +58,12 @@ export function DocumentsTable({
     toggleColumn,
     reorderColumns,
     resetToDefaults,
-  } = useTableSettings({ storageKey: 'documentsTable', alwaysVisibleIds: ALWAYS_VISIBLE, defaultOrder: DOCUMENTS_DEFAULT_ORDER });
+  } = useTableSettings({
+    storageKey: 'documentsTable',
+    alwaysVisibleIds: ALWAYS_VISIBLE,
+    defaultOrder: DOCUMENTS_DEFAULT_ORDER,
+    defaultHidden: DEFAULT_HIDDEN,
+  });
 
   const columns = useMemo<ColumnDef<DocumentRow>[]>(
     () => [
@@ -52,8 +75,11 @@ export function DocumentsTable({
           const code = row.original.documentType?.code ?? 'UNCLASSIFIED';
           const config = docTypeIcons[code] ?? docTypeIcons['UNCLASSIFIED']!;
           const Icon = config!.icon;
+          const isExpanded = expandedId === row.original.id;
+          const Chevron = isExpanded ? ChevronDown : ChevronRight;
           return (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Chevron size={16} className="text-gray-400 flex-shrink-0" />
               <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center ${config!.color}`}>
                 <Icon size={16} />
               </div>
@@ -85,6 +111,51 @@ export function DocumentsTable({
         ),
       },
       {
+        id: 'customer',
+        header: 'Customer',
+        cell: ({ row }) => docFieldCell(row.original, 'customer_name'),
+      },
+      {
+        id: 'order',
+        header: 'Order',
+        cell: ({ row }) => docFieldCell(row.original, 'order_id'),
+      },
+      {
+        id: 'orderType',
+        header: 'Order Type',
+        cell: ({ row }) => docFieldCell(row.original, 'order_type'),
+      },
+      {
+        id: 'phone',
+        header: 'Phone',
+        cell: ({ row }) => docFieldCell(row.original, 'phone'),
+      },
+      {
+        id: 'salesperson',
+        header: 'Salesperson',
+        cell: ({ row }) => docFieldCell(row.original, 'salesperson'),
+      },
+      {
+        id: 'stat',
+        header: 'Stat',
+        cell: ({ row }) => docFieldCell(row.original, 'stat'),
+      },
+      {
+        id: 'zone',
+        header: 'Zone',
+        cell: ({ row }) => docFieldCell(row.original, 'zone'),
+      },
+      {
+        id: 'fulfillmentType',
+        header: 'Fulfillment Type',
+        cell: ({ row }) => docFieldCell(row.original, 'fulfillment_type'),
+      },
+      {
+        id: 'customerCode',
+        header: 'Customer Code',
+        cell: ({ row }) => docFieldCell(row.original, 'customer_code'),
+      },
+      {
         id: 'scannedDate',
         accessorKey: 'created_at',
         header: 'Scanned Date',
@@ -92,7 +163,7 @@ export function DocumentsTable({
           format(new Date(row.original.created_at), 'MMM d, yyyy'),
       },
     ],
-    []
+    [expandedId]
   );
 
   const table = useReactTable({
@@ -135,23 +206,34 @@ export function DocumentsTable({
           ))}
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {table.getRowModel().rows.map((row) => (
-            <tr
-              key={row.id}
-              className="hover:bg-gray-50 cursor-pointer"
-              onClick={() => onRowClick(row.original.id)}
-            >
-              {row.getVisibleCells().map((cell) => (
-                <td
-                  key={cell.id}
-                  className="px-4 py-3"
-                  style={{ width: cell.column.getSize() }}
+          {table.getRowModel().rows.map((row) => {
+            const isExpanded = expandedId === row.original.id;
+            return (
+              <Fragment key={row.id}>
+                <tr
+                  className={`hover:bg-gray-50 cursor-pointer ${isExpanded ? 'bg-blue-50/50' : ''}`}
+                  onClick={() => toggleExpanded(row.original.id)}
                 >
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
-          ))}
+                  {row.getVisibleCells().map((cell) => (
+                    <td
+                      key={cell.id}
+                      className="px-4 py-3"
+                      style={{ width: cell.column.getSize() }}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+                {isExpanded && (
+                  <DocumentExpandedRows
+                    documentId={row.original.id}
+                    colSpan={row.getVisibleCells().length}
+                    onPageClick={onPageClick}
+                  />
+                )}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>

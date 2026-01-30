@@ -37,4 +37,5 @@ export interface DocumentRow {
     store: { store_number: string };
   };
   documentType: { name: string; code: string } | null;
+  extraction_fields: Record<string, string | undefined> | null;
 }
