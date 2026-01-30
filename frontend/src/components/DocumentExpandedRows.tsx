@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
 import { fetchDocumentExtractions } from '../api/client';
 import type { PageExtractionRecord } from '../types/extraction';
 
@@ -64,6 +63,7 @@ export function DocumentExpandedRows({
           <table className="w-full">
             <thead>
               <tr className="text-xs text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-2 text-left w-20">Conf.</th>
                 <th className="px-4 py-2 text-left w-16">Page</th>
                 {FIELD_COLUMNS.map((col) => (
                   <th key={col.key} className="px-4 py-2 text-left">{col.label}</th>
@@ -100,8 +100,12 @@ function PageRow({
       onClick={() => onPageClick(extraction.document_id, extraction.page_number)}
     >
       <td className="px-4 py-2 text-sm">
-        <span className="inline-flex items-center gap-1 text-blue-600 font-medium">
-          <ChevronRight size={14} />
+        <span className={`font-medium ${extraction.confidence >= 0.7 ? 'text-green-600' : extraction.confidence >= 0.4 ? 'text-yellow-600' : 'text-red-600'}`}>
+          {Math.round(extraction.confidence * 100)}%
+        </span>
+      </td>
+      <td className="px-4 py-2 text-sm">
+        <span className="text-blue-600 font-medium">
           p.{extraction.page_number}
         </span>
       </td>

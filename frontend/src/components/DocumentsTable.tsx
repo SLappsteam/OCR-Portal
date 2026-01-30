@@ -43,10 +43,22 @@ export function DocumentsTable({
   onSortingChange,
   onPageClick,
 }: DocumentsTableProps) {
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(() => {
+    try {
+      const raw = sessionStorage.getItem('documentsExpandedIds');
+      return raw ? new Set(JSON.parse(raw) as number[]) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
 
   const toggleExpanded = useCallback((id: number) => {
-    setExpandedId((prev) => (prev === id ? null : id));
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      sessionStorage.setItem('documentsExpandedIds', JSON.stringify([...next]));
+      return next;
+    });
   }, []);
   const {
     columnVisibility,
@@ -75,7 +87,7 @@ export function DocumentsTable({
           const code = row.original.documentType?.code ?? 'UNCLASSIFIED';
           const config = docTypeIcons[code] ?? docTypeIcons['UNCLASSIFIED']!;
           const Icon = config!.icon;
-          const isExpanded = expandedId === row.original.id;
+          const isExpanded = expandedIds.has(row.original.id);
           const Chevron = isExpanded ? ChevronDown : ChevronRight;
           return (
             <div className="flex items-center gap-2">
@@ -163,7 +175,7 @@ export function DocumentsTable({
           format(new Date(row.original.created_at), 'MMM d, yyyy'),
       },
     ],
-    [expandedId]
+    [expandedIds]
   );
 
   const table = useReactTable({
@@ -207,7 +219,7 @@ export function DocumentsTable({
         </thead>
         <tbody className="divide-y divide-gray-100">
           {table.getRowModel().rows.map((row) => {
-            const isExpanded = expandedId === row.original.id;
+            const isExpanded = expandedIds.has(row.original.id);
             return (
               <Fragment key={row.id}>
                 <tr
