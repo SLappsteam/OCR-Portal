@@ -1,4 +1,5 @@
 import { FinsalesData } from './types';
+import { uppercaseFields } from './finsalesParser';
 
 const TICKET_PATTERN = /\*\s*(DELIVERY|RETURN)\s+TICKET\s*\*/i;
 const ORDER_ID_PATTERN = /(?:Order|Return)\s+ID:\s*(\S+)/i;
@@ -15,7 +16,7 @@ export function isTicketPage(rawText: string): boolean {
 }
 
 export function parseTicketText(rawText: string): FinsalesData {
-  return {
+  return uppercaseFields({
     ticket_type: extractTicketType(rawText),
     order_type: null,
     order_id: extractOrderId(rawText),
@@ -28,7 +29,11 @@ export function parseTicketText(rawText: string): FinsalesData {
     salesperson: extractField(rawText, SALESPERSON_PATTERN),
     truck_id: extractTruckId(rawText),
     total_sale: extractField(rawText, GROSS_SALES_PATTERN),
-  };
+    stat: null,
+    zone: null,
+    fulfillment_type: null,
+    customer_code: null,
+  });
 }
 
 export function calculateTicketConfidence(fields: FinsalesData): number {

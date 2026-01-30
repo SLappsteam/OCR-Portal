@@ -1,8 +1,8 @@
 import { FinsalesData } from './types';
 
 export function parseFinsalesText(rawText: string): FinsalesData {
-  const { address, orderType } = extractAddressAndOrderType(rawText);
-  return {
+  const { address, orderType, fulfillmentType } = extractAddressAndOrderType(rawText);
+  return uppercaseFields({
     ticket_type: null,
     order_type: orderType,
     order_id: extractOrderId(rawText),
@@ -15,7 +15,11 @@ export function parseFinsalesText(rawText: string): FinsalesData {
     salesperson: extractSalesperson(rawText),
     truck_id: null,
     total_sale: extractTotal(rawText),
-  };
+    stat: extractStat(rawText),
+    zone: extractZone(rawText),
+    fulfillment_type: fulfillmentType,
+    customer_code: extractCustomerCode(rawText),
+  });
 }
 
 function extractOrderId(text: string): string | null {
@@ -56,25 +60,33 @@ function extractCustomerName(text: string): string | null {
 
 function extractAddressAndOrderType(
   text: string
-): { address: string | null; orderType: string | null } {
+): { address: string | null; orderType: string | null; fulfillmentType: string | null } {
   const lines = text.split('\n');
   for (let i = 0; i < lines.length; i++) {
-    if (!/ORDER\s+TYPE/i.test(lines[i] ?? '')) continue;
+    const headerLine = lines[i] ?? '';
+    if (!/ORDER\s+TYPE/i.test(headerLine)) continue;
+
+    // Order type from header line: "ORDER TYPE: SAL"
+    const otMatch = headerLine.match(/ORDER\s+TYPE\s*:\s*(\S+)/i);
+    const orderType = otMatch?.[1]?.trim() ?? null;
+
     const nextLine = lines[i + 1];
-    if (!nextLine) continue;
+    if (!nextLine) return { address: null, orderType, fulfillmentType: null };
 
     // Strip store city/state/zip from left column (anchored to comma + state)
     const afterZip = nextLine.replace(
       /^.*,\s*[A-Z0-9|]{2}\s+\d{5}(?:-\d{4})?\s+/, ''
     );
-    if (!afterZip || afterZip === nextLine) continue;
+    if (!afterZip || afterZip === nextLine) {
+      return { address: null, orderType, fulfillmentType: null };
+    }
 
     const typeMatch = afterZip.match(/\s+(Pickup|Delivery)\s*[|]?\s*$/i);
-    const orderType = typeMatch?.[1] ? typeMatch[1].trim() : null;
+    const fulfillmentType = typeMatch?.[1]?.trim() ?? null;
     const address = afterZip.replace(/\s*(Pickup|Delivery)\s*[|]?\s*$/i, '').trim() || null;
-    return { address, orderType };
+    return { address, orderType, fulfillmentType };
   }
-  return { address: null, orderType: null };
+  return { address: null, orderType: null, fulfillmentType: null };
 }
 
 function extractCityStateZip(text: string): string | null {
@@ -112,6 +124,33 @@ function extractSalesperson(text: string): string | null {
 function extractTotal(text: string): string | null {
   const match = text.match(/Gross\s*Sales?:?\s*\$?\s*([\d,.]+)/i);
   return match?.[1]?.trim() ?? null;
+}
+
+function extractStat(text: string): string | null {
+  const match = text.match(/STAT:\s*(\S+)/i);
+  return match?.[1]?.trim() ?? null;
+}
+
+function extractZone(text: string): string | null {
+  // Zone appears after the date on the same DATE: line
+  const match = text.match(/DATE:\s*[\d/]+\s+(\S+)/i);
+  return match?.[1]?.trim() ?? null;
+}
+
+function extractCustomerCode(text: string): string | null {
+  const match = text.match(/C\.\s*Code:\s*(\S+)/i);
+  return match?.[1]?.trim() ?? null;
+}
+
+export function uppercaseFields(data: FinsalesData): FinsalesData {
+  const result = { ...data };
+  for (const key of Object.keys(result) as (keyof FinsalesData)[]) {
+    const val = result[key];
+    if (typeof val === 'string') {
+      (result[key] as string) = val.toUpperCase();
+    }
+  }
+  return result;
 }
 
 export function calculateConfidence(fields: FinsalesData): number {

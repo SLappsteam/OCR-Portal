@@ -14,10 +14,14 @@ const FIELD_LABELS: Record<string, string> = {
   address: 'Address',
   city_state_zip: 'City/State/Zip',
   phone: 'Phone',
-  delivery_date: 'Delivery Date',
+  delivery_date: 'Date',
   salesperson: 'Salesperson',
   truck_id: 'Truck ID',
   total_sale: 'Total Sale',
+  stat: 'Stat',
+  zone: 'Zone',
+  fulfillment_type: 'Fulfillment Type',
+  customer_code: 'C. Code',
 };
 
 export function ExtractionFields({ fields }: ExtractionFieldsProps) {

@@ -18,6 +18,10 @@ export interface FinsalesFields {
   salesperson?: string;
   truck_id?: string;
   total_sale?: string;
+  stat?: string;
+  zone?: string;
+  fulfillment_type?: string;
+  customer_code?: string;
 }
 
 export interface PageExtractionRecord {

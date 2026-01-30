@@ -11,6 +11,10 @@ export interface FinsalesData {
   salesperson: string | null;
   truck_id: string | null;
   total_sale: string | null;
+  stat: string | null;
+  zone: string | null;
+  fulfillment_type: string | null;
+  customer_code: string | null;
 }
 
 export interface ExtractionResult {
