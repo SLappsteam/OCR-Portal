@@ -1,5 +1,6 @@
 import type { ApiResponse } from '../types';
 import type { PageExtractionRecord, PageSearchResult } from '../types/extraction';
+import type { FieldFilter } from '../types/filters';
 
 const API_BASE_URL = import.meta.env['VITE_API_URL'] ?? '/api';
 
@@ -126,11 +127,17 @@ export async function searchPages(params: {
   search: string;
   storeNumber?: string;
   documentType?: string;
+  filters?: FieldFilter[];
 }): Promise<PageSearchResult[]> {
   const searchParams = new URLSearchParams();
   searchParams.set('search', params.search);
   if (params.storeNumber) searchParams.set('storeNumber', params.storeNumber);
   if (params.documentType) searchParams.set('documentType', params.documentType);
+  if (params.filters) {
+    for (const f of params.filters) {
+      searchParams.append('filters', `${f.field}:${f.value}`);
+    }
+  }
 
   const endpoint = `/api/page-search?${searchParams.toString()}`;
   const response = await apiClient.get<ApiResponse<PageSearchResult[]>>(endpoint);

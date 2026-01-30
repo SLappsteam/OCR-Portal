@@ -11,6 +11,7 @@ interface UseTableSettingsOptions {
   storageKey: string;
   alwaysVisibleIds: string[];
   defaultOrder: string[];
+  defaultHidden?: string[];
 }
 
 function loadSettings(key: string): StoredSettings | null {
@@ -26,15 +27,25 @@ function saveSettings(key: string, settings: StoredSettings) {
   localStorage.setItem(`table-settings-${key}`, JSON.stringify(settings));
 }
 
+function buildDefaultVisibility(hidden?: string[]): VisibilityState {
+  if (!hidden || hidden.length === 0) return {};
+  const vis: VisibilityState = {};
+  for (const id of hidden) {
+    vis[id] = false;
+  }
+  return vis;
+}
+
 export function useTableSettings({
   storageKey,
   alwaysVisibleIds,
   defaultOrder,
+  defaultHidden,
 }: UseTableSettingsOptions) {
   const stored = loadSettings(storageKey);
 
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
-    stored?.visibility ?? {},
+    stored?.visibility ?? buildDefaultVisibility(defaultHidden),
   );
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(
     stored?.sizing ?? {},

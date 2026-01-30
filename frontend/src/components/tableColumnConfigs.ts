@@ -21,6 +21,13 @@ export const PAGE_SEARCH_TABLE_COLUMNS: ColumnMeta[] = [
   { id: 'page', label: 'Page', isLocked: false },
   { id: 'customer', label: 'Customer', isLocked: false },
   { id: 'order', label: 'Order', isLocked: false },
+  { id: 'orderType', label: 'Order Type', isLocked: false },
+  { id: 'phone', label: 'Phone', isLocked: false },
+  { id: 'salesperson', label: 'Salesperson', isLocked: false },
+  { id: 'stat', label: 'Stat', isLocked: false },
+  { id: 'zone', label: 'Zone', isLocked: false },
+  { id: 'fulfillmentType', label: 'Fulfillment Type', isLocked: false },
+  { id: 'customerCode', label: 'Customer Code', isLocked: false },
   { id: 'date', label: 'Date', isLocked: false },
   { id: 'scanned', label: 'Scanned', isLocked: false },
 ];

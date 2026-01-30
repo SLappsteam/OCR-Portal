@@ -24,6 +24,17 @@ interface PageSearchTableProps {
 }
 
 const ALWAYS_VISIBLE: string[] = [];
+const DEFAULT_HIDDEN = [
+  'orderType', 'phone', 'salesperson', 'stat',
+  'zone', 'fulfillmentType', 'customerCode',
+];
+
+function fieldCell(row: PageSearchResult, key: keyof PageSearchResult['fields']) {
+  const val = row.fields[key];
+  return val
+    ? <span className="text-sm">{String(val)}</span>
+    : <span className="text-gray-400">-</span>;
+}
 
 export function PageSearchTable({
   results,
@@ -41,7 +52,12 @@ export function PageSearchTable({
     toggleColumn,
     reorderColumns,
     resetToDefaults,
-  } = useTableSettings({ storageKey: 'pageSearchTable', alwaysVisibleIds: ALWAYS_VISIBLE, defaultOrder: PAGE_SEARCH_DEFAULT_ORDER });
+  } = useTableSettings({
+    storageKey: 'pageSearchTable',
+    alwaysVisibleIds: ALWAYS_VISIBLE,
+    defaultOrder: PAGE_SEARCH_DEFAULT_ORDER,
+    defaultHidden: DEFAULT_HIDDEN,
+  });
 
   const columns = useMemo<ColumnDef<PageSearchResult>[]>(
     () => [
@@ -107,6 +123,41 @@ export function PageSearchTable({
             ? <span className="font-mono text-sm">{orderId}</span>
             : <span className="text-gray-400">-</span>;
         },
+      },
+      {
+        id: 'orderType',
+        header: 'Order Type',
+        cell: ({ row }) => fieldCell(row.original, 'order_type'),
+      },
+      {
+        id: 'phone',
+        header: 'Phone',
+        cell: ({ row }) => fieldCell(row.original, 'phone'),
+      },
+      {
+        id: 'salesperson',
+        header: 'Salesperson',
+        cell: ({ row }) => fieldCell(row.original, 'salesperson'),
+      },
+      {
+        id: 'stat',
+        header: 'Stat',
+        cell: ({ row }) => fieldCell(row.original, 'stat'),
+      },
+      {
+        id: 'zone',
+        header: 'Zone',
+        cell: ({ row }) => fieldCell(row.original, 'zone'),
+      },
+      {
+        id: 'fulfillmentType',
+        header: 'Fulfillment Type',
+        cell: ({ row }) => fieldCell(row.original, 'fulfillment_type'),
+      },
+      {
+        id: 'customerCode',
+        header: 'Customer Code',
+        cell: ({ row }) => fieldCell(row.original, 'customer_code'),
       },
       {
         id: 'date',
