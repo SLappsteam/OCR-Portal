@@ -2,7 +2,9 @@ import { FinsalesData } from './types';
 
 export const STREET_SUFFIX =
   '(?:Street|Court|Avenue|Boulevard|Drive|Road|Lane|Place|Circle|Highway|Parkway|Trail' +
-  '|St\\.?|Ave\\.?|Blvd\\.?|Dr\\.?|Rd\\.?|Way|Ln\\.?|Ct\\.?|Pl\\.?|Cir\\.?|Hwy\\.?|Pkwy\\.?)';
+  '|St\\.?|Ave\\.?|Blvd\\.?|Dr\\.?|Rd\\.?|Way|Ln\\.?|Ct\\.?|Pl\\.?|Cir\\.?|Hwy\\.?|Pkwy\\.?|Trl\\.?)';
+
+const HEADER_LINE_PATTERN = /TYPE\s*:.*STAT\s*:/i;
 
 export function extractHeader(rawText: string): Partial<FinsalesData> {
   const { address, orderType, fulfillmentType } = extractAddressAndOrderType(rawText);
@@ -41,14 +43,13 @@ function extractCustomerName(text: string): string | null {
   const match = text.match(primary);
   if (match?.[1]) return match[1].trim();
 
-  // Fallback: line containing "ORDER TYPE:" — name between address and ORDER TYPE
+  // Fallback: find header line via TYPE: + STAT:, extract name after street suffix
   const lines = text.split('\n');
-  for (const line of lines) {
-    if (!/ORDER\s+TYPE/i.test(line)) continue;
-    const before = line.split(/ORDER\s+TYPE/i)[0] ?? '';
-    const nameMatch = before.match(
-      /([A-Z][A-Za-z/]+(?:\s+[A-Z][A-Za-z/]+)+)\s*$/
-    );
+  const idx = lines.findIndex((l) => HEADER_LINE_PATTERN.test(l));
+  if (idx >= 0) {
+    const before = (lines[idx] ?? '').split(/TYPE\s*:/i)[0] ?? '';
+    const afterStreet = before.replace(new RegExp(`^.*${STREET_SUFFIX}\\s+`, 'i'), '');
+    const nameMatch = afterStreet.match(/^([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*)/);
     if (nameMatch?.[1]) return nameMatch[1].trim();
   }
 
@@ -103,29 +104,28 @@ function extractAddressAndOrderType(
   text: string
 ): { address: string | null; orderType: string | null; fulfillmentType: string | null } {
   const lines = text.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    const headerLine = lines[i] ?? '';
-    if (!/ORDER\s+TYPE/i.test(headerLine)) continue;
+  const idx = lines.findIndex((l) => HEADER_LINE_PATTERN.test(l));
+  if (idx < 0) return { address: null, orderType: null, fulfillmentType: null };
 
-    const otMatch = headerLine.match(/ORDER\s+TYPE\s*:\s*(\S+)/i);
-    const orderType = otMatch?.[1]?.trim() ?? null;
+  const headerLine = lines[idx] ?? '';
+  const otMatch = headerLine.match(/TYPE\s*:\s*(\S+)/i);
+  const orderType = otMatch?.[1]?.trim() ?? null;
 
-    const nextLine = lines[i + 1];
-    if (!nextLine) return { address: null, orderType, fulfillmentType: null };
+  const nextLine = lines[idx + 1];
+  if (!nextLine) return { address: null, orderType, fulfillmentType: null };
 
-    const afterZip = nextLine.replace(
-      /^.*,\s*[A-Z0-9|]{2}\s+\d{5}(?:-\d{4})?\s+/, ''
-    );
-    if (!afterZip || afterZip === nextLine) {
-      return { address: null, orderType, fulfillmentType: null };
-    }
-
-    const typeMatch = afterZip.match(/\s+(Pickup|Delivery)\s*[|]?\s*$/i);
-    const fulfillmentType = typeMatch?.[1]?.trim() ?? null;
-    const address = afterZip.replace(/\s*(Pickup|Delivery)\s*[|]?\s*$/i, '').trim() || null;
-    return { address, orderType, fulfillmentType };
+  const afterZip = nextLine.replace(
+    /^.*,\s*[A-Z0-9|]{2}\s+\d{5}(?:-\d{4})?\s+/, ''
+  );
+  if (!afterZip || afterZip === nextLine) {
+    return { address: null, orderType, fulfillmentType: null };
   }
-  return { address: null, orderType: null, fulfillmentType: null };
+
+  const typeMatch = afterZip.match(/\s+(Pickup|Delivery)\s*[|]?\s*$/i);
+  const fulfillmentType = typeMatch?.[1]?.trim() ?? null;
+  const rawAddress = afterZip.replace(/\s*(Pickup|Delivery)\s*[|]?\s*$/i, '').trim();
+  const address = rawAddress.replace(/[\s\\|«»<>]+$/, '').trim() || null;
+  return { address, orderType, fulfillmentType };
 }
 
 function extractCityStateZip(text: string): string | null {
