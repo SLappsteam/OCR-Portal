@@ -1,16 +1,17 @@
 import { FinsalesData } from './types';
 import { uppercaseFields } from './headerParser';
 
-const TICKET_PATTERN = /(DELIVERY|RETURN)\s+TIC\w*ET/i;
+const TICKET_PATTERN = /(D\s*E\s*L\s*I\s*V\s*E\s*R\s*Y|R\s*E\s*T\s*U\s*R\s*N)\s+TIC\w*ET/i;
 const ORDER_ID_PATTERN = /(?:Order|Return)\s+(?:ID|1D|0)[;:]\s*(.+?)(?:\s*\(|$)/im;
-const CUSTOMER_ID_PATTERN = /Customer\s+ID:\s*(\S+)/i;
+const CUSTOMER_ID_PATTERN = /Customer\s+ID[;:]\s*(\S+)/i;
 const DELIVERY_DATE_PATTERN = /Delivery\s+Date:\s*([\d/]+)/i;
-const SALESPERSON_PATTERN = /Salesperson:\s*(\S+)/i;
+const SALESPERSON_PATTERN = /Salesperson:\s*([A-Za-z0-9]+)/i;
 const TRUCK_ID_PATTERN = /Truck\s+ID:\s*(.+)/i;
 const SUBTOTAL_PATTERN = /Subtotal:?\s*\$?\s*([\d,.]+)/i;
 const SHIPPING_ZONE_PATTERN = /Shipping\s+Zone:\s*(\S+)/i;
 const STOP_PATTERN = /Stop:\s*(\d+)/i;
 const MOBILE_PATTERN = /Mobile:\s*(\(?\d{3}\)?\s*[-.]?\s*\d{3}\s*[-.]?\s*\d{4})/g;
+const SECONDARY_PHONE_PATTERN = /Secondary\s+Phone:\s*(\(?\d{3}\)?\s*[-.]?\s*\d{3}\s*[-.]?\s*\d{4})/gi;
 const CITY_STATE_ZIP_PATTERN = /^([A-Z][A-Za-z\s]+,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?)$/;
 
 export function isTicketPage(rawText: string): boolean {
@@ -20,7 +21,6 @@ export function isTicketPage(rawText: string): boolean {
 export function parseTicketText(rawText: string): FinsalesData {
   const { billTo, shipTo } = parseAddressBlock(rawText);
   return uppercaseFields({
-    ticket_type: null,
     order_type: extractTicketType(rawText),
     order_id: extractOrderId(rawText),
     customer_name: billTo[0] ?? null,
@@ -38,7 +38,6 @@ export function parseTicketText(rawText: string): FinsalesData {
     stat: null,
     stop: extractField(rawText, STOP_PATTERN),
     zone: extractField(rawText, SHIPPING_ZONE_PATTERN),
-    fulfillment_type: null,
     customer_code: null,
     finance_company: null,
     financed_amount: null,
@@ -53,7 +52,7 @@ export function calculateTicketConfidence(fields: FinsalesData): number {
 
 function extractTicketType(text: string): string | null {
   const match = text.match(TICKET_PATTERN);
-  return match?.[1]?.toUpperCase() ?? null;
+  return match?.[1]?.replace(/\s+/g, '').toUpperCase() ?? null;
 }
 
 function extractOrderId(text: string): string | null {
@@ -79,7 +78,13 @@ function parseAddressBlock(text: string): { billTo: string[]; shipTo: string[] }
   const lines = text.split('\n');
   const headerIdx = findAddressHeaderIndex(lines);
   if (headerIdx < 0) return { billTo: [], shipTo: [] };
-  return extractColumnsFromIndex(lines, headerIdx + 1);
+
+  const headerLine = lines[headerIdx] ?? '';
+  const hasBothColumns = /Ship\s*To/i.test(headerLine);
+  if (hasBothColumns) {
+    return extractColumnsFromIndex(lines, headerIdx + 1);
+  }
+  return extractSingleColumn(lines, headerIdx + 1);
 }
 
 function findAddressHeaderIndex(lines: string[]): number {
@@ -101,14 +106,29 @@ function extractColumnsFromIndex(
   const billTo: string[] = [];
   const shipTo: string[] = [];
   for (let j = startIdx; j < Math.min(startIdx + 7, lines.length); j++) {
-    const raw = lines[j]?.trim() ?? '';
-    if (/Mobile:/i.test(raw)) break;
+    const raw = lines[j]?.trim().replace(/^[|]+\s*/, '').replace(/\s*[|]+$/, '') ?? '';
+    if (/Mobile:/i.test(raw) || /Secondary\s+Phone:/i.test(raw)) break;
     if (!raw) continue;
     const { left, right } = splitColumns(raw);
     if (left) billTo.push(left);
     if (right) shipTo.push(right);
   }
   return { billTo, shipTo: shipTo.length > 0 ? shipTo : billTo };
+}
+
+function extractSingleColumn(
+  lines: string[],
+  startIdx: number,
+): { billTo: string[]; shipTo: string[] } {
+  const entries: string[] = [];
+  for (let j = startIdx; j < Math.min(startIdx + 7, lines.length); j++) {
+    const raw = lines[j]?.trim().replace(/^[|]+\s*/, '').replace(/\s*[|]+$/, '') ?? '';
+    if (/Mobile:/i.test(raw) || /Secondary\s+Phone:/i.test(raw)) break;
+    if (!raw) continue;
+    const leftPart = raw.split(/\s{3,}/)[0]?.trim().replace(/[,]+$/, '') ?? '';
+    if (leftPart.length >= 4) entries.push(leftPart);
+  }
+  return { billTo: entries, shipTo: entries };
 }
 
 function splitColumns(line: string): { left: string; right: string } {
@@ -138,11 +158,20 @@ function extractCityStateZip(lines: string[]): string | null {
 }
 
 function extractPhone(text: string): string | null {
-  const matches = [...text.matchAll(MOBILE_PATTERN)];
-  if (matches.length === 0) return null;
-  // Prefer second match (Ship To) if available and different
-  if (matches.length >= 2 && matches[1]![1] !== matches[0]![1]) {
-    return matches[1]![1]!.trim();
+  const mobileMatches = [...text.matchAll(MOBILE_PATTERN)];
+  const secondaryMatches = [...text.matchAll(SECONDARY_PHONE_PATTERN)];
+
+  const mobile = mobileMatches[0]?.[1]?.trim() ?? null;
+  const secondary = dedupeSecondary(secondaryMatches);
+
+  if (mobile && secondary && mobile !== secondary) {
+    return `${mobile}, ${secondary}`;
   }
-  return matches[0]![1]!.trim();
+  return mobile ?? secondary;
+}
+
+function dedupeSecondary(matches: RegExpExecArray[]): string | null {
+  if (matches.length === 0) return null;
+  const unique = new Set(matches.map((m) => m[1]!.trim()));
+  return [...unique][0] ?? null;
 }

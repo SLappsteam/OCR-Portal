@@ -24,10 +24,18 @@ interface DocumentsTableProps {
   onPageClick: (documentId: number, pageNumber: number) => void;
 }
 
+const STATUS_STYLES: Record<string, { label: string; className: string }> = {
+  pending: { label: 'Pending', className: 'bg-yellow-100 text-yellow-800' },
+  processing: { label: 'Processing', className: 'bg-blue-100 text-blue-800' },
+  completed: { label: 'Complete', className: 'bg-green-100 text-green-800' },
+  failed: { label: 'Failed', className: 'bg-red-100 text-red-800' },
+  review_required: { label: 'Review', className: 'bg-orange-100 text-orange-800' },
+};
+
 const ALWAYS_VISIBLE: string[] = [];
 const DEFAULT_HIDDEN = [
   'customer', 'order', 'orderType', 'phone', 'salesperson',
-  'stat', 'zone', 'fulfillmentType', 'customerCode',
+  'zone', 'customerCode',
 ];
 
 function docFieldCell(row: DocumentRow, key: string) {
@@ -101,6 +109,19 @@ export function DocumentsTable({
         },
       },
       {
+        id: 'status',
+        accessorKey: 'status',
+        header: 'Status',
+        cell: ({ row }) => {
+          const style = STATUS_STYLES[row.original.status] ?? STATUS_STYLES['pending']!;
+          return (
+            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${style.className}`}>
+              {style.label}
+            </span>
+          );
+        },
+      },
+      {
         id: 'store',
         accessorKey: 'batch.store.store_number',
         header: 'Store',
@@ -148,19 +169,9 @@ export function DocumentsTable({
         cell: ({ row }) => docFieldCell(row.original, 'salesperson'),
       },
       {
-        id: 'stat',
-        header: 'Stat',
-        cell: ({ row }) => docFieldCell(row.original, 'stat'),
-      },
-      {
         id: 'zone',
         header: 'Zone',
         cell: ({ row }) => docFieldCell(row.original, 'zone'),
-      },
-      {
-        id: 'fulfillmentType',
-        header: 'Fulfillment Type',
-        cell: ({ row }) => docFieldCell(row.original, 'fulfillment_type'),
       },
       {
         id: 'customerCode',

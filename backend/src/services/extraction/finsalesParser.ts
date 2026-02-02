@@ -8,7 +8,6 @@ export function parseFinsalesPage(rawText: string): FinsalesData {
   const header = extractHeader(rawText);
 
   const base: FinsalesData = {
-    ticket_type: null,
     order_type: header.order_type ?? null,
     order_id: header.order_id ?? null,
     customer_name: header.customer_name ?? null,
@@ -26,7 +25,6 @@ export function parseFinsalesPage(rawText: string): FinsalesData {
     stat: header.stat ?? null,
     stop: null,
     zone: header.zone ?? null,
-    fulfillment_type: header.fulfillment_type ?? null,
     customer_code: header.customer_code ?? null,
     finance_company: null,
     financed_amount: null,

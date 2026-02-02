@@ -25,8 +25,8 @@ interface PageSearchTableProps {
 
 const ALWAYS_VISIBLE: string[] = [];
 const DEFAULT_HIDDEN = [
-  'orderType', 'phone', 'salesperson', 'stat',
-  'zone', 'fulfillmentType', 'customerCode',
+  'orderType', 'phone', 'salesperson',
+  'zone', 'customerCode',
 ];
 
 function fieldCell(row: PageSearchResult, key: keyof PageSearchResult['fields']) {
@@ -140,19 +140,9 @@ export function PageSearchTable({
         cell: ({ row }) => fieldCell(row.original, 'salesperson'),
       },
       {
-        id: 'stat',
-        header: 'Stat',
-        cell: ({ row }) => fieldCell(row.original, 'stat'),
-      },
-      {
         id: 'zone',
         header: 'Zone',
         cell: ({ row }) => fieldCell(row.original, 'zone'),
-      },
-      {
-        id: 'fulfillmentType',
-        header: 'Fulfillment Type',
-        cell: ({ row }) => fieldCell(row.original, 'fulfillment_type'),
       },
       {
         id: 'customerCode',

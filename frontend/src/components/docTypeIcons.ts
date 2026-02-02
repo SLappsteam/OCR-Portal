@@ -30,6 +30,7 @@ export const docTypeIcons: Record<string, { icon: React.ElementType; color: stri
 export interface DocumentRow {
   id: number;
   reference: string | null;
+  status: string;
   page_start: number;
   page_end: number;
   created_at: string;

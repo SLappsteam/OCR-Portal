@@ -1,5 +1,4 @@
 export interface FinsalesData {
-  ticket_type: string | null;
   order_type: string | null;
   order_id: string | null;
   customer_name: string | null;
@@ -17,7 +16,6 @@ export interface FinsalesData {
   stat: string | null;
   stop: string | null;
   zone: string | null;
-  fulfillment_type: string | null;
   customer_code: string | null;
   finance_company: string | null;
   financed_amount: string | null;

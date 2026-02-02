@@ -24,10 +24,6 @@ async function getDocumentWithBatch(documentId: number) {
   return document;
 }
 
-function calculateActualPage(document: { page_start: number }, pageNumber: number): number {
-  return document.page_start + (pageNumber - 1);
-}
-
 router.get(
   '/:documentId/:pageNumber',
   async (req: Request, res: Response, next: NextFunction) => {
@@ -35,23 +31,21 @@ router.get(
       const documentId = parseInt(req.params['documentId'] ?? '', 10);
       const pageNumber = parseInt(req.params['pageNumber'] ?? '', 10);
 
-      if (isNaN(documentId) || isNaN(pageNumber) || pageNumber < 1) {
+      if (isNaN(documentId) || isNaN(pageNumber) || pageNumber < 0) {
         throw new BadRequestError('Invalid document ID or page number');
       }
 
       const document = await getDocumentWithBatch(documentId);
-      const pageCount = document.page_end - document.page_start + 1;
 
-      if (pageNumber > pageCount) {
+      if (pageNumber < document.page_start || pageNumber > document.page_end) {
         throw new BadRequestError(
-          `Page ${pageNumber} exceeds document page count (${pageCount})`
+          `Page ${pageNumber} is outside document range (${document.page_start}-${document.page_end})`
         );
       }
 
-      const actualPage = calculateActualPage(document, pageNumber);
       const imageBuffer = await extractPageAsPng(
         document.batch.file_path,
-        actualPage
+        pageNumber
       );
 
       res.set({

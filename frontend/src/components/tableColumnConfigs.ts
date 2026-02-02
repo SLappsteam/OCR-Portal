@@ -8,6 +8,7 @@ interface ColumnMeta {
 
 export const DOCUMENTS_TABLE_COLUMNS: ColumnMeta[] = [
   { id: 'documentType', label: 'Document Type', isLocked: false },
+  { id: 'status', label: 'Status', isLocked: false },
   { id: 'store', label: 'Store', isLocked: false },
   { id: 'pages', label: 'Pages', isLocked: false },
   { id: 'reference', label: 'Reference', isLocked: false },
@@ -16,9 +17,7 @@ export const DOCUMENTS_TABLE_COLUMNS: ColumnMeta[] = [
   { id: 'orderType', label: 'Order Type', isLocked: false },
   { id: 'phone', label: 'Phone', isLocked: false },
   { id: 'salesperson', label: 'Salesperson', isLocked: false },
-  { id: 'stat', label: 'Stat', isLocked: false },
   { id: 'zone', label: 'Zone', isLocked: false },
-  { id: 'fulfillmentType', label: 'Fulfillment Type', isLocked: false },
   { id: 'customerCode', label: 'Customer Code', isLocked: false },
   { id: 'scannedDate', label: 'Scanned Date', isLocked: false },
 ];
@@ -33,9 +32,7 @@ export const PAGE_SEARCH_TABLE_COLUMNS: ColumnMeta[] = [
   { id: 'orderType', label: 'Order Type', isLocked: false },
   { id: 'phone', label: 'Phone', isLocked: false },
   { id: 'salesperson', label: 'Salesperson', isLocked: false },
-  { id: 'stat', label: 'Stat', isLocked: false },
   { id: 'zone', label: 'Zone', isLocked: false },
-  { id: 'fulfillmentType', label: 'Fulfillment Type', isLocked: false },
   { id: 'customerCode', label: 'Customer Code', isLocked: false },
   { id: 'date', label: 'Date', isLocked: false },
   { id: 'scanned', label: 'Scanned', isLocked: false },

@@ -148,8 +148,8 @@ export function BatchDetailsPanel({ batchId, stores, onStoreChanged }: Props) {
                   </td>
                   <td className="px-3 py-2">
                     {doc.page_start === doc.page_end
-                      ? doc.page_start + 1
-                      : `${doc.page_start + 1}-${doc.page_end + 1}`}
+                      ? doc.page_start
+                      : `${doc.page_start}-${doc.page_end}`}
                   </td>
                   <td className="px-3 py-2">
                     <span

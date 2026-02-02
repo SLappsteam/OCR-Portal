@@ -17,6 +17,5 @@ export const FILTERABLE_FIELDS: FilterableField[] = [
   { field: 'salesperson', label: 'Salesperson' },
   { field: 'stat', label: 'Stat' },
   { field: 'zone', label: 'Zone' },
-  { field: 'fulfillment_type', label: 'Fulfillment Type' },
   { field: 'customer_code', label: 'Customer Code' },
 ];

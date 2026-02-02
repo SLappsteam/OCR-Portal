@@ -23,7 +23,6 @@ const FIELD_LABELS: Record<string, string> = {
   stat: 'Stat',
   stop: 'Stop',
   zone: 'Zone',
-  fulfillment_type: 'Fulfillment Type',
   customer_code: 'C. Code',
   finance_company: 'Finance Co.',
   financed_amount: 'Financed Amt.',

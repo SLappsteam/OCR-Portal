@@ -44,7 +44,7 @@ export function DocumentViewer() {
   const [document, setDocument] = useState<DocumentData | null>(null);
   const [docTypes, setDocTypes] = useState<{ id: number; name: string }[]>([]);
   const [extractions, setExtractions] = useState<PageExtractionRecord[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stores, setStores] = useState<{ id: number; store_number: string; name: string }[]>([]);
@@ -65,9 +65,8 @@ export function DocumentViewer() {
   }, [extractions]);
 
   const currentExtraction = useMemo(() => {
-    if (!document) return null;
-    const absolutePage = document.page_start + currentPage - 1;
-    return extractionMap.get(absolutePage) ?? null;
+    if (!document || currentPage === null) return null;
+    return extractionMap.get(currentPage) ?? null;
   }, [document, currentPage, extractionMap]);
 
   const currentPageFields = currentExtraction?.fields ?? null;
@@ -105,11 +104,13 @@ export function DocumentViewer() {
         const pageParam = searchParams.get('page');
         if (pageParam) {
           const pageNum = parseInt(pageParam, 10);
-          const absolutePage = pageNum;
-          const relativePage = absolutePage - doc.page_start + 1;
-          if (relativePage >= 1 && relativePage <= doc.page_end - doc.page_start + 1) {
-            setCurrentPage(relativePage);
+          if (pageNum >= doc.page_start && pageNum <= doc.page_end) {
+            setCurrentPage(pageNum);
+          } else {
+            setCurrentPage(doc.page_start);
           }
+        } else {
+          setCurrentPage(doc.page_start);
         }
       })
       .catch((err: Error) => setError(err.message))
@@ -144,7 +145,7 @@ export function DocumentViewer() {
     return <div className="text-gray-600">Loading document...</div>;
   }
 
-  if (error || !document) {
+  if (error || !document || currentPage === null) {
     return (
       <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded">
         {error ?? 'Document not found'}
@@ -165,7 +166,7 @@ export function DocumentViewer() {
 
       <div className="flex-1 flex gap-4 min-h-0">
         <div className="w-24 bg-white rounded-lg shadow p-2 overflow-y-auto">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+          {Array.from({ length: totalPages }, (_, i) => document.page_start + i).map((page) => (
             <button
               key={page}
               onClick={() => changePage(page)}
@@ -180,7 +181,7 @@ export function DocumentViewer() {
                 alt={`Page ${page}`}
                 className="w-full h-auto"
               />
-              <span className="text-xs text-gray-500">Page {page}</span>
+              <span className="text-xs text-gray-500">p.{page}</span>
             </button>
           ))}
         </div>
@@ -261,8 +262,8 @@ export function DocumentViewer() {
 
       <div className="mt-4 flex items-center justify-center gap-4 bg-white rounded-lg shadow p-3">
         <button
-          onClick={() => changePage(Math.max(1, currentPage - 1))}
-          disabled={currentPage === 1}
+          onClick={() => changePage(Math.max(document.page_start, currentPage! - 1))}
+          disabled={currentPage === document.page_start}
           className="p-2 hover:bg-gray-100 rounded disabled:opacity-50"
         >
           <ChevronLeft size={20} />
@@ -271,20 +272,20 @@ export function DocumentViewer() {
           Page{' '}
           <input
             type="number"
-            min={1}
-            max={totalPages}
-            value={currentPage}
+            min={document.page_start}
+            max={document.page_end}
+            value={currentPage ?? document.page_start}
             onChange={(e) => {
               const val = parseInt(e.target.value, 10);
-              if (val >= 1 && val <= totalPages) changePage(val);
+              if (val >= document.page_start && val <= document.page_end) changePage(val);
             }}
             className="w-12 text-center border rounded px-1 py-0.5"
           />{' '}
           of {totalPages}
         </span>
         <button
-          onClick={() => changePage(Math.min(totalPages, currentPage + 1))}
-          disabled={currentPage === totalPages}
+          onClick={() => changePage(Math.min(document.page_end, currentPage! + 1))}
+          disabled={currentPage === document.page_end}
           className="p-2 hover:bg-gray-100 rounded disabled:opacity-50"
         >
           <ChevronRight size={20} />

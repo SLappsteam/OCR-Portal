@@ -7,12 +7,12 @@ export const STREET_SUFFIX =
 const HEADER_LINE_PATTERN = /TYPE\s*:.*STAT\s*[.:]/i;
 
 export function extractHeader(rawText: string): Partial<FinsalesData> {
-  const { address, orderType, fulfillmentType } = extractAddressAndOrderType(rawText);
+  const { address, fulfillmentType } = extractAddressAndFulfillment(rawText);
   const billToAddress = address ?? extractBillToAddress(rawText);
   const cityStateZip = extractCityStateZip(rawText) ?? extractBillToCityStateZip(rawText);
 
   return {
-    order_type: orderType,
+    order_type: fulfillmentType,
     order_id: extractOrderId(rawText),
     customer_name: extractCustomerName(rawText),
     address: billToAddress,
@@ -22,7 +22,6 @@ export function extractHeader(rawText: string): Partial<FinsalesData> {
     salesperson: extractSalesperson(rawText),
     stat: extractStat(rawText),
     zone: extractZone(rawText),
-    fulfillment_type: fulfillmentType,
     customer_code: extractCustomerCode(rawText),
   };
 }
@@ -100,32 +99,28 @@ function getBillToBlock(text: string): string[] {
   return [];
 }
 
-function extractAddressAndOrderType(
+function extractAddressAndFulfillment(
   text: string
-): { address: string | null; orderType: string | null; fulfillmentType: string | null } {
+): { address: string | null; fulfillmentType: string | null } {
   const lines = text.split('\n');
   const idx = lines.findIndex((l) => HEADER_LINE_PATTERN.test(l));
-  if (idx < 0) return { address: null, orderType: null, fulfillmentType: null };
-
-  const headerLine = lines[idx] ?? '';
-  const otMatch = headerLine.match(/TYPE\s*:\s*(\S+)/i);
-  const orderType = otMatch?.[1]?.trim() ?? null;
+  if (idx < 0) return { address: null, fulfillmentType: null };
 
   const nextLine = lines[idx + 1];
-  if (!nextLine) return { address: null, orderType, fulfillmentType: null };
+  if (!nextLine) return { address: null, fulfillmentType: null };
 
   const afterZip = nextLine.replace(
     /^.*,\s*[A-Z0-9|]{2}\s+\d{5}(?:-\d{4})?\s+/, ''
   );
   if (!afterZip || afterZip === nextLine) {
-    return { address: null, orderType, fulfillmentType: null };
+    return { address: null, fulfillmentType: null };
   }
 
   const typeMatch = afterZip.match(/\s+(Pickup|Delivery)\s*[|]?\s*$/i);
   const fulfillmentType = typeMatch?.[1]?.trim() ?? null;
   const rawAddress = afterZip.replace(/\s*(Pickup|Delivery)\s*[|]?\s*$/i, '').trim();
   const address = rawAddress.replace(/[\s\\|«»<>]+$/, '').trim() || null;
-  return { address, orderType, fulfillmentType };
+  return { address, fulfillmentType };
 }
 
 function extractCityStateZip(text: string): string | null {
@@ -136,15 +131,19 @@ function extractCityStateZip(text: string): string | null {
 }
 
 function extractPhone(text: string): string | null {
-  const mobile = text.match(
-    /M\/P[;:]\s*(\(?\d{3}\)?\s*[-.]?\s*\d{3}\s*[-.]?\s*\d{4})/
-  );
-  if (mobile?.[1]) return mobile[1].trim();
+  const phonePattern = /(\(?\d{3}\)?\s*[-.]?\s*\d{3}\s*[-.]?\s*\d{4})/;
 
-  const secondary = text.match(
-    /S\/P[;:]\s*(\(?\d{3}\)?\s*[-.]?\s*\d{3}\s*[-.]?\s*\d{4})/
-  );
-  return secondary?.[1]?.trim() ?? null;
+  const mobile = text.match(new RegExp(`M\\/P[;:]\\s*${phonePattern.source}`));
+  const sp = text.match(new RegExp(`S\\/P[;:]\\s*${phonePattern.source}`));
+  const secondary = text.match(new RegExp(`Secondary\\s+Phone:\\s*${phonePattern.source}`, 'i'));
+
+  const primary = mobile?.[1]?.trim() ?? null;
+  const fallback = sp?.[1]?.trim() ?? secondary?.[1]?.trim() ?? null;
+
+  if (primary && fallback && primary !== fallback) {
+    return `${primary}, ${fallback}`;
+  }
+  return primary ?? fallback;
 }
 
 function extractDate(text: string): string | null {
