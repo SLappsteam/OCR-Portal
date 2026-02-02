@@ -98,6 +98,17 @@ export async function correctPageImage(
         .toBuffer();
     }
 
+    // Clean image for OCR: light blur removes thin table borders, threshold
+    // produces crisp binary text. Tested: eliminates border artifacts (e.g.
+    // cell edges read as extra characters) with minimal confidence impact.
+    corrected = await sharp(corrected)
+      .grayscale()
+      .normalize()
+      .blur(1.0)
+      .threshold(170)
+      .png()
+      .toBuffer();
+
     return corrected;
   } catch (error) {
     logger.debug('Image correction failed, returning original', error);

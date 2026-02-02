@@ -159,7 +159,9 @@ function extractSalesperson(text: string): string | null {
 
 function extractStat(text: string): string | null {
   const match = text.match(/STAT:\s*(\S+)/i);
-  return match?.[1]?.trim() ?? null;
+  if (!match?.[1]) return null;
+  // STAT codes are letters — map common OCR digit misreads to letters
+  return match[1].replace(/0/g, 'O').replace(/1/g, 'I');
 }
 
 function extractZone(text: string): string | null {
