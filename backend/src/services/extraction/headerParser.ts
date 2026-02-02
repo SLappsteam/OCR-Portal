@@ -26,7 +26,7 @@ export function extractHeader(rawText: string): Partial<FinsalesData> {
 }
 
 function extractOrderId(text: string): string | null {
-  const numberMatch = text.match(/NUMBER\s*:\s*(\d\S+)/i);
+  const numberMatch = text.match(/(?:NUMBER|RETURN)\s*:\s*(\d\S+)/i);
   if (numberMatch?.[1]) return numberMatch[1].trim();
 
   const orderMatch = text.match(/Order\s*#\s*:?\s*(\d\S+)/i);
