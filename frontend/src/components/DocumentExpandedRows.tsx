@@ -16,6 +16,7 @@ const FIELD_COLUMNS: { key: string; label: string }[] = [
   { key: 'salesperson', label: 'Salesperson' },
   { key: 'stat', label: 'Stat' },
   { key: 'zone', label: 'Zone' },
+  { key: 'stop', label: 'Stop' },
   { key: 'fulfillment_type', label: 'Fulfillment' },
   { key: 'customer_code', label: 'Customer Code' },
 ];

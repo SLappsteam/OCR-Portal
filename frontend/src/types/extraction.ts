@@ -13,12 +13,16 @@ export interface FinsalesFields {
   customer_id?: string;
   address?: string;
   city_state_zip?: string;
+  ship_to_name?: string;
+  ship_to_address?: string;
+  ship_to_city_state_zip?: string;
   phone?: string;
   delivery_date?: string;
   salesperson?: string;
   truck_id?: string;
   total_sale?: string;
   stat?: string;
+  stop?: string;
   zone?: string;
   fulfillment_type?: string;
   customer_code?: string;

@@ -2,12 +2,14 @@ import { FinsalesData } from './types';
 import { uppercaseFields } from './headerParser';
 
 const TICKET_PATTERN = /(DELIVERY|RETURN)\s+TIC\w*ET/i;
-const ORDER_ID_PATTERN = /(?:Order|Return)\s+ID:\s*(\S+)/i;
+const ORDER_ID_PATTERN = /(?:Order|Return)\s+(?:ID|1D|0)[;:]\s*(.+?)(?:\s*\(|$)/im;
 const CUSTOMER_ID_PATTERN = /Customer\s+ID:\s*(\S+)/i;
 const DELIVERY_DATE_PATTERN = /Delivery\s+Date:\s*([\d/]+)/i;
 const SALESPERSON_PATTERN = /Salesperson:\s*(\S+)/i;
 const TRUCK_ID_PATTERN = /Truck\s+ID:\s*(.+)/i;
-const GROSS_SALES_PATTERN = /Gross\s*Sales?:?\s*\$?\s*([\d,.]+)/i;
+const SUBTOTAL_PATTERN = /Subtotal:?\s*\$?\s*([\d,.]+)/i;
+const SHIPPING_ZONE_PATTERN = /Shipping\s+Zone:\s*(\S+)/i;
+const STOP_PATTERN = /Stop:\s*(\d+)/i;
 const MOBILE_PATTERN = /Mobile:\s*(\(?\d{3}\)?\s*[-.]?\s*\d{3}\s*[-.]?\s*\d{4})/g;
 const CITY_STATE_ZIP_PATTERN = /^([A-Z][A-Za-z\s]+,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?)$/;
 
@@ -16,21 +18,26 @@ export function isTicketPage(rawText: string): boolean {
 }
 
 export function parseTicketText(rawText: string): FinsalesData {
+  const { billTo, shipTo } = parseAddressBlock(rawText);
   return uppercaseFields({
-    ticket_type: extractTicketType(rawText),
-    order_type: null,
+    ticket_type: null,
+    order_type: extractTicketType(rawText),
     order_id: extractOrderId(rawText),
-    customer_name: extractCustomerName(rawText),
+    customer_name: billTo[0] ?? null,
     customer_id: extractField(rawText, CUSTOMER_ID_PATTERN),
-    address: extractShipToAddress(rawText),
-    city_state_zip: extractShipToCityStateZip(rawText),
+    address: billTo[1] ?? null,
+    city_state_zip: extractCityStateZip(billTo),
+    ship_to_name: shipTo[0] ?? null,
+    ship_to_address: shipTo[1] ?? null,
+    ship_to_city_state_zip: extractCityStateZip(shipTo),
     phone: extractPhone(rawText),
     delivery_date: extractField(rawText, DELIVERY_DATE_PATTERN),
     salesperson: extractField(rawText, SALESPERSON_PATTERN),
     truck_id: extractTruckId(rawText),
-    total_sale: extractField(rawText, GROSS_SALES_PATTERN),
+    total_sale: extractField(rawText, SUBTOTAL_PATTERN),
     stat: null,
-    zone: null,
+    stop: extractField(rawText, STOP_PATTERN),
+    zone: extractField(rawText, SHIPPING_ZONE_PATTERN),
     fulfillment_type: null,
     customer_code: null,
     finance_company: null,
@@ -51,7 +58,8 @@ function extractTicketType(text: string): string | null {
 
 function extractOrderId(text: string): string | null {
   const match = text.match(ORDER_ID_PATTERN);
-  return match?.[1]?.trim() ?? null;
+  if (!match?.[1]) return null;
+  return match[1].replace(/\s+/g, '').trim() || null;
 }
 
 function extractField(text: string, pattern: RegExp): string | null {
@@ -63,41 +71,44 @@ function extractTruckId(text: string): string | null {
   const match = text.match(TRUCK_ID_PATTERN);
   const value = match?.[1]?.trim() ?? null;
   if (!value) return null;
-  // Stop at next known field if captured too much
-  return value.split(/\n/)[0]?.trim() ?? value;
+  const firstLine = value.split(/\n/)[0]?.trim() ?? value;
+  return firstLine.replace(/[^A-Za-z0-9]+$/, '') || null;
 }
 
 function parseAddressBlock(text: string): { billTo: string[]; shipTo: string[] } {
   const lines = text.split('\n');
+  const headerIdx = findAddressHeaderIndex(lines);
+  if (headerIdx < 0) return { billTo: [], shipTo: [] };
+  return extractColumnsFromIndex(lines, headerIdx + 1);
+}
 
+function findAddressHeaderIndex(lines: string[]): number {
+  // Primary: find Bill To label (tolerate OCR misreads like "Bilt", "Bil")
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? '';
-    if (!/Bill\s+To:/i.test(line)) continue;
-
-    const isTwoColumn = /Ship\s+To:/i.test(line);
-    if (isTwoColumn) {
-      const billTo: string[] = [];
-      const shipTo: string[] = [];
-      for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
-        const raw = lines[j]?.trim() ?? '';
-        if (!raw || /Mobile:/i.test(raw)) break;
-        const { left, right } = splitColumns(raw);
-        if (left) billTo.push(left);
-        if (right) shipTo.push(right);
-      }
-      return { billTo, shipTo: shipTo.length > 0 ? shipTo : billTo };
-    }
-
-    // Single-column: Bill To only
-    const block: string[] = [];
-    for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
-      const raw = lines[j]?.trim();
-      if (raw) block.push(raw);
-    }
-    return { billTo: block, shipTo: block };
+    if (/B[il1][il1][ilt1]?\s*To[;:]/i.test(lines[i] ?? '')) return i;
   }
+  // Fallback: address block follows Marker ID line
+  for (let i = 0; i < lines.length; i++) {
+    if (/Marker\s+\w+:/i.test(lines[i] ?? '')) return i;
+  }
+  return -1;
+}
 
-  return { billTo: [], shipTo: [] };
+function extractColumnsFromIndex(
+  lines: string[],
+  startIdx: number,
+): { billTo: string[]; shipTo: string[] } {
+  const billTo: string[] = [];
+  const shipTo: string[] = [];
+  for (let j = startIdx; j < Math.min(startIdx + 7, lines.length); j++) {
+    const raw = lines[j]?.trim() ?? '';
+    if (/Mobile:/i.test(raw)) break;
+    if (!raw) continue;
+    const { left, right } = splitColumns(raw);
+    if (left) billTo.push(left);
+    if (right) shipTo.push(right);
+  }
+  return { billTo, shipTo: shipTo.length > 0 ? shipTo : billTo };
 }
 
 function splitColumns(line: string): { left: string; right: string } {
@@ -119,16 +130,8 @@ function splitColumns(line: string): { left: string; right: string } {
   return { left: line.trim(), right: line.trim() };
 }
 
-function extractCustomerName(text: string): string | null {
-  return parseAddressBlock(text).billTo[0] ?? null;
-}
-
-function extractShipToAddress(text: string): string | null {
-  return parseAddressBlock(text).shipTo[1] ?? null;
-}
-
-function extractShipToCityStateZip(text: string): string | null {
-  for (const line of parseAddressBlock(text).shipTo.slice(2)) {
+function extractCityStateZip(lines: string[]): string | null {
+  for (const line of lines.slice(2)) {
     if (CITY_STATE_ZIP_PATTERN.test(line)) return line;
   }
   return null;
