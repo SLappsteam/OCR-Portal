@@ -4,7 +4,7 @@ export const STREET_SUFFIX =
   '(?:Street|Court|Avenue|Boulevard|Drive|Road|Lane|Place|Circle|Highway|Parkway|Trail' +
   '|St\\.?|Ave\\.?|Blvd\\.?|Dr\\.?|Rd\\.?|Way|Ln\\.?|Ct\\.?|Pl\\.?|Cir\\.?|Hwy\\.?|Pkwy\\.?|Trl\\.?)';
 
-const HEADER_LINE_PATTERN = /TYPE\s*:.*STAT\s*:/i;
+const HEADER_LINE_PATTERN = /TYPE\s*:.*STAT\s*[.:]/i;
 
 export function extractHeader(rawText: string): Partial<FinsalesData> {
   const { address, orderType, fulfillmentType } = extractAddressAndOrderType(rawText);
@@ -158,7 +158,7 @@ function extractSalesperson(text: string): string | null {
 }
 
 function extractStat(text: string): string | null {
-  const match = text.match(/STAT:\s*(\S+)/i);
+  const match = text.match(/STAT[.:]\s*(\S+)/i);
   if (!match?.[1]) return null;
   // STAT codes are letters — map common OCR digit misreads to letters
   return match[1].replace(/0/g, 'O').replace(/1/g, 'I');
