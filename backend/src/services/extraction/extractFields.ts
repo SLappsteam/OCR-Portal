@@ -9,7 +9,7 @@ import { scanBarcodeInRegion } from '../barcodeService';
 import { PageExtractionResult } from './types';
 import { logger } from '../../utils/logger';
 
-const SUPPORTED_DOC_TYPES = ['FINSALES'];
+const SUPPORTED_DOC_TYPES = ['FINSALES', 'FINTRAN'];
 const LOW_CONFIDENCE_THRESHOLD = 50;
 const PAGE_CONCURRENCY = 4;
 
