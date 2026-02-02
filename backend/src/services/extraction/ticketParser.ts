@@ -67,46 +67,71 @@ function extractTruckId(text: string): string | null {
   return value.split(/\n/)[0]?.trim() ?? value;
 }
 
-function extractCustomerName(text: string): string | null {
+function parseAddressBlock(text: string): { billTo: string[]; shipTo: string[] } {
   const lines = text.split('\n');
+
   for (let i = 0; i < lines.length; i++) {
-    if (/Bill\s+To:/i.test(lines[i] ?? '')) {
-      const nameLine = lines[i + 1]?.trim();
-      if (nameLine && /^[A-Z]/.test(nameLine)) {
-        return nameLine.split(/\s{3,}/)[0]?.trim() ?? nameLine;
+    const line = lines[i] ?? '';
+    if (!/Bill\s+To:/i.test(line)) continue;
+
+    const isTwoColumn = /Ship\s+To:/i.test(line);
+    if (isTwoColumn) {
+      const billTo: string[] = [];
+      const shipTo: string[] = [];
+      for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+        const raw = lines[j]?.trim() ?? '';
+        if (!raw || /Mobile:/i.test(raw)) break;
+        const { left, right } = splitColumns(raw);
+        if (left) billTo.push(left);
+        if (right) shipTo.push(right);
       }
+      return { billTo, shipTo: shipTo.length > 0 ? shipTo : billTo };
     }
+
+    // Single-column: Bill To only
+    const block: string[] = [];
+    for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+      const raw = lines[j]?.trim();
+      if (raw) block.push(raw);
+    }
+    return { billTo: block, shipTo: block };
   }
-  return null;
+
+  return { billTo: [], shipTo: [] };
+}
+
+function splitColumns(line: string): { left: string; right: string } {
+  // Exact duplication (Bill To = Ship To): "LISA CHEN LISA CHEN" → "LISA CHEN"
+  const dupMatch = line.match(/^(.{3,}?)\s+\1\s*$/);
+  if (dupMatch) {
+    const val = dupMatch[1]!.trim();
+    return { left: val, right: val };
+  }
+  // Different values: split at nearest word boundary to midpoint
+  const mid = Math.floor(line.length / 2);
+  const after = line.indexOf(' ', mid);
+  const before = line.lastIndexOf(' ', mid);
+  const splitAt = after >= 0 && (before < 0 || after - mid <= mid - before)
+    ? after : before;
+  if (splitAt > 0) {
+    return { left: line.substring(0, splitAt).trim(), right: line.substring(splitAt).trim() };
+  }
+  return { left: line.trim(), right: line.trim() };
+}
+
+function extractCustomerName(text: string): string | null {
+  return parseAddressBlock(text).billTo[0] ?? null;
 }
 
 function extractShipToAddress(text: string): string | null {
-  const block = getShipToBlock(text);
-  return block[1] ?? null;
+  return parseAddressBlock(text).shipTo[1] ?? null;
 }
 
 function extractShipToCityStateZip(text: string): string | null {
-  const block = getShipToBlock(text);
-  for (const line of block.slice(2)) {
-    if (CITY_STATE_ZIP_PATTERN.test(line)) {
-      return line;
-    }
+  for (const line of parseAddressBlock(text).shipTo.slice(2)) {
+    if (CITY_STATE_ZIP_PATTERN.test(line)) return line;
   }
   return null;
-}
-
-function getShipToBlock(text: string): string[] {
-  const lines = text.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    if (!/Ship\s+To:/i.test(lines[i] ?? '')) continue;
-    const block: string[] = [];
-    for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
-      const line = lines[j]?.trim();
-      if (line) block.push(line);
-    }
-    return block;
-  }
-  return [];
 }
 
 function extractPhone(text: string): string | null {
