@@ -137,12 +137,12 @@ function extractCityStateZip(text: string): string | null {
 
 function extractPhone(text: string): string | null {
   const mobile = text.match(
-    /M\/P:\s*(\(?\d{3}\)?\s*[-.]?\s*\d{3}\s*[-.]?\s*\d{4})/
+    /M\/P[;:]\s*(\(?\d{3}\)?\s*[-.]?\s*\d{3}\s*[-.]?\s*\d{4})/
   );
   if (mobile?.[1]) return mobile[1].trim();
 
   const secondary = text.match(
-    /S\/P:\s*(\(?\d{3}\)?\s*[-.]?\s*\d{3}\s*[-.]?\s*\d{4})/
+    /S\/P[;:]\s*(\(?\d{3}\)?\s*[-.]?\s*\d{3}\s*[-.]?\s*\d{4})/
   );
   return secondary?.[1]?.trim() ?? null;
 }
