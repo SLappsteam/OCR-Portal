@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft,
   ZoomIn,
   ZoomOut,
   RotateCcw,
@@ -40,7 +39,6 @@ interface BatchData {
 
 export function BatchViewer() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [batch, setBatch] = useState<BatchData | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
@@ -103,12 +101,6 @@ export function BatchViewer() {
   return (
     <div className="h-[calc(100vh-6rem)] flex flex-col">
       <div className="flex items-center gap-4 mb-4 flex-wrap">
-        <button
-          onClick={() => navigate('/batches')}
-          className="p-2 hover:bg-gray-100 rounded"
-        >
-          <ArrowLeft size={20} />
-        </button>
         <h1 className="text-xl font-bold font-mono">
           {batch.reference ?? `Batch #${batch.id}`}
         </h1>
