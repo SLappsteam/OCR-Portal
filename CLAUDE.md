@@ -8,7 +8,7 @@
  - Functions are verbs
  - Constants in SCREAMING_SNAKE
  - Database in snake_case
-Rotating Logs
+## Rotating Logs
  - 10MB max per file
  - 5 files retained
  - No sensitive data logged
@@ -22,7 +22,7 @@ Rotating Logs
  - Input validation
  - Parameterized queries
  - Least privilege
-Guardrails
+## Guardrails
  - Don't touch generated files
  - Don't touch lock files directly
  - Don't touch CI configs without review
