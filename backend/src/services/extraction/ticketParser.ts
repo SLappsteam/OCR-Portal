@@ -21,7 +21,7 @@ export function isTicketPage(rawText: string): boolean {
 export function parseTicketText(rawText: string): FinsalesData {
   const { billTo, shipTo } = parseAddressBlock(rawText);
   return uppercaseFields({
-    order_type: extractTicketType(rawText),
+    fulfillment: extractTicketType(rawText),
     order_id: extractOrderId(rawText),
     customer_name: billTo[0] ?? null,
     customer_id: extractField(rawText, CUSTOMER_ID_PATTERN),

@@ -16,7 +16,7 @@ const querySchema = z.object({
 
 const ALLOWED_FILTER_FIELDS = new Set([
   'customer_name', 'customer_id', 'order_id', 'phone',
-  'order_type', 'salesperson', 'stat', 'zone',
+  'fulfillment', 'salesperson', 'stat', 'zone',
   'customer_code',
 ]);
 
@@ -46,7 +46,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
     const searchFields = [
       'customer_name', 'order_id', 'customer_id', 'phone',
-      'order_type', 'salesperson', 'stat', 'zone',
+      'fulfillment', 'salesperson', 'stat', 'zone',
       'customer_code',
     ];
     const jsonOrFilters = searchFields.map((field) => ({

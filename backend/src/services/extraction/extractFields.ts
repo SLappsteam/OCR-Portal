@@ -158,7 +158,7 @@ async function tryExtractTicket(
   const confidence = calculateTicketConfidence(fields);
 
   logger.info(
-    `Extracted ${fields.order_type} ticket ${docTypeCode} page ${pageNumber}: ` +
+    `Extracted ${fields.fulfillment} ticket ${docTypeCode} page ${pageNumber}: ` +
     `order=${fields.order_id}, customer=${fields.customer_name} (barcode=${barcode ?? 'none'})`
   );
 

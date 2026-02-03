@@ -1,2 +1,2 @@
-export { extractAllPages } from './extractFields';
+export { extractAllPages, extractSinglePage } from './extractFields';
 export type { ExtractionResult, FinsalesData, PageExtractionResult } from './types';

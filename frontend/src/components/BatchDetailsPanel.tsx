@@ -1,38 +1,39 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Store } from 'lucide-react';
-import { fetchBatchDocuments, updateBatchStore } from '../api/client';
+import { FileText, Layers, AlertCircle } from 'lucide-react';
+import { fetchBatchDocuments } from '../api/client';
 
 interface DocumentRow {
   id: number;
-  page_start: number;
-  page_end: number;
+  page_number: number;
   status: string;
   documentType: { name: string; code: string } | null;
 }
 
-interface BatchDetails {
+interface ChildBatch {
   id: number;
-  documents: DocumentRow[];
-  store: { id: number; store_number: string };
+  reference: string | null;
+  batch_type: string | null;
+  status: string;
+  page_count: number | null;
 }
 
-interface StoreOption {
+interface BatchDetails {
   id: number;
-  store_number: string;
+  page_count: number;
+  documents: DocumentRow[];
+  childBatches: ChildBatch[];
+  store: { id: number; store_number: string };
 }
 
 interface Props {
   batchId: number;
-  stores: StoreOption[];
-  onStoreChanged: () => void;
 }
 
-export function BatchDetailsPanel({ batchId, stores, onStoreChanged }: Props) {
+export function BatchDetailsPanel({ batchId }: Props) {
   const navigate = useNavigate();
   const [details, setDetails] = useState<BatchDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -43,27 +44,6 @@ export function BatchDetailsPanel({ batchId, stores, onStoreChanged }: Props) {
       .catch((err) => setError(err.message))
       .finally(() => setIsLoading(false));
   }, [batchId]);
-
-  const handleStoreChange = async (newStoreId: number) => {
-    if (!details || newStoreId === details.store.id) return;
-    setIsUpdating(true);
-    try {
-      await updateBatchStore(batchId, newStoreId);
-      onStoreChanged();
-      setDetails((prev) =>
-        prev
-          ? {
-              ...prev,
-              store: stores.find((s) => s.id === newStoreId) ?? prev.store,
-            }
-          : null
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update store');
-    } finally {
-      setIsUpdating(false);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -81,91 +61,133 @@ export function BatchDetailsPanel({ batchId, stores, onStoreChanged }: Props) {
 
   if (!details) return null;
 
-  const isUnassigned = details.store.store_number === 'UNASSIGNED';
+  const documentsByPage = new Map(
+    details.documents.map((d) => [d.page_number, d])
+  );
+  const missingPages: number[] = [];
+  for (let i = 0; i < details.page_count; i++) {
+    if (!documentsByPage.has(i)) {
+      missingPages.push(i);
+    }
+  }
 
   return (
     <div className="px-8 py-4 bg-gray-50 border-t">
-      <div className="flex items-center gap-4 mb-4">
-        <div className="flex items-center gap-2">
-          <Store size={16} className="text-gray-500" />
-          <span className="text-sm font-medium text-gray-700">
-            Assign Store:
-          </span>
-          <select
-            value={details.store.id}
-            onChange={(e) => handleStoreChange(Number(e.target.value))}
-            disabled={isUpdating}
-            className={`border rounded px-2 py-1 text-sm ${
-              isUnassigned ? 'border-amber-400 bg-amber-50' : ''
-            }`}
-          >
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.store_number === 'UNASSIGNED'
-                  ? 'UNASSIGNED'
-                  : `Store ${s.store_number}`}
-              </option>
-            ))}
-          </select>
-          {isUpdating && (
-            <span className="text-xs text-gray-500">Updating...</span>
-          )}
+      {details.childBatches.length > 0 && (
+        <div className="mb-4">
+          <div className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+            <Layers size={16} />
+            Related Batches ({details.childBatches.length})
+          </div>
+          <div className="bg-white rounded border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="px-3 py-2 text-left">Reference</th>
+                  <th className="px-3 py-2 text-left">Type</th>
+                  <th className="px-3 py-2 text-left">Pages</th>
+                  <th className="px-3 py-2 text-left">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {details.childBatches.map((child) => (
+                  <tr
+                    key={child.id}
+                    onClick={() => navigate(`/batches/${child.id}`)}
+                    className="hover:bg-gray-50 cursor-pointer opacity-60"
+                  >
+                    <td className="px-3 py-2 font-mono">
+                      {child.reference ?? '-'}
+                    </td>
+                    <td className="px-3 py-2">{child.batch_type ?? '-'}</td>
+                    <td className="px-3 py-2">{child.page_count ?? '-'}</td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={`px-2 py-0.5 text-xs rounded-full ${
+                          child.status === 'completed'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {child.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
         <FileText size={16} />
-        Documents ({details.documents.length})
+        Pages ({details.page_count}) - {details.documents.length} documents
       </div>
 
-      {details.documents.length === 0 ? (
-        <div className="text-sm text-gray-500 italic">
-          No documents found in this batch
-        </div>
-      ) : (
-        <div className="bg-white rounded border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-3 py-2 text-left">ID</th>
-                <th className="px-3 py-2 text-left">Type</th>
-                <th className="px-3 py-2 text-left">Pages</th>
-                <th className="px-3 py-2 text-left">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {details.documents.map((doc) => (
+      <div className="bg-white rounded border overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="px-3 py-2 text-left">Page</th>
+              <th className="px-3 py-2 text-left">Type</th>
+              <th className="px-3 py-2 text-left">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {Array.from({ length: details.page_count }, (_, i) => {
+              const doc = documentsByPage.get(i);
+              const hasDoc = !!doc;
+              return (
                 <tr
-                  key={doc.id}
-                  onClick={() => navigate(`/documents/${doc.id}`)}
-                  className="hover:bg-gray-50 cursor-pointer"
+                  key={i}
+                  onClick={() => navigate(`/batches/${batchId}?page=${i}`)}
+                  className={`hover:bg-gray-50 cursor-pointer ${
+                    !hasDoc ? 'bg-amber-50' : ''
+                  }`}
                 >
-                  <td className="px-3 py-2">{doc.id}</td>
+                  <td className="px-3 py-2 font-medium">
+                    p.{i}
+                  </td>
                   <td className="px-3 py-2">
-                    {doc.documentType?.name ?? (
-                      <span className="text-gray-400 italic">Unclassified</span>
+                    {doc?.documentType?.name ?? (
+                      <span className={hasDoc ? 'text-gray-400 italic' : 'text-amber-600 flex items-center gap-1'}>
+                        {hasDoc ? 'Unclassified' : (
+                          <>
+                            <AlertCircle size={14} />
+                            No document
+                          </>
+                        )}
+                      </span>
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    {doc.page_start === doc.page_end
-                      ? doc.page_start
-                      : `${doc.page_start}-${doc.page_end}`}
-                  </td>
-                  <td className="px-3 py-2">
-                    <span
-                      className={`px-2 py-0.5 text-xs rounded-full ${
-                        doc.status === 'completed'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {doc.status}
-                    </span>
+                    {doc ? (
+                      <span
+                        className={`px-2 py-0.5 text-xs rounded-full ${
+                          doc.status === 'completed'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {doc.status}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700">
+                        missing
+                      </span>
+                    )}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {missingPages.length > 0 && (
+        <div className="mt-2 text-xs text-amber-600">
+          Missing documents on pages: {missingPages.join(', ')}
         </div>
       )}
     </div>

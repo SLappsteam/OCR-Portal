@@ -17,7 +17,7 @@ export function extractHeader(rawText: string): Partial<FinsalesData> {
   const isCredit = CREDIT_LINE_PATTERN.test(rawText);
 
   return {
-    order_type: fulfillmentType ?? (isCredit ? 'CREDIT' : null),
+    fulfillment: fulfillmentType ?? (isCredit ? 'CREDIT' : null),
     order_id: extractOrderId(rawText),
     customer_name: extractCustomerName(rawText),
     address: billToAddress,

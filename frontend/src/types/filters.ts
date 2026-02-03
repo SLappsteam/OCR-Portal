@@ -13,7 +13,7 @@ export const FILTERABLE_FIELDS: FilterableField[] = [
   { field: 'customer_id', label: 'Customer ID' },
   { field: 'order_id', label: 'Order ID' },
   { field: 'phone', label: 'Phone' },
-  { field: 'order_type', label: 'Order Type' },
+  { field: 'fulfillment', label: 'Fulfillment' },
   { field: 'salesperson', label: 'Salesperson' },
   { field: 'stat', label: 'Stat' },
   { field: 'zone', label: 'Zone' },

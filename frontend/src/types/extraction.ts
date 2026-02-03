@@ -6,7 +6,7 @@ export interface SummaryOrder {
 export interface FinsalesFields {
   document_type?: string;
   orders?: SummaryOrder[];
-  order_type?: string;
+  fulfillment?: string;
   order_id?: string;
   customer_name?: string;
   customer_id?: string;

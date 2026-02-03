@@ -25,7 +25,7 @@ interface PageSearchTableProps {
 
 const ALWAYS_VISIBLE: string[] = [];
 const DEFAULT_HIDDEN = [
-  'orderType', 'phone', 'salesperson',
+  'fulfillment', 'phone', 'salesperson',
   'zone', 'customerCode',
 ];
 
@@ -145,9 +145,9 @@ export function PageSearchTable({
         },
       },
       {
-        id: 'orderType',
-        header: 'Order Type',
-        cell: ({ row }) => fieldCell(row.original, 'order_type'),
+        id: 'fulfillment',
+        header: 'Fulfillment',
+        cell: ({ row }) => fieldCell(row.original, 'fulfillment'),
       },
       {
         id: 'phone',

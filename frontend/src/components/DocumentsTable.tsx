@@ -32,7 +32,7 @@ const STATUS_STYLES: Record<string, { label: string; className: string }> = {
 
 const ALWAYS_VISIBLE: string[] = [];
 const DEFAULT_HIDDEN = [
-  'customer', 'order', 'orderType', 'phone', 'salesperson',
+  'customer', 'order', 'fulfillment', 'phone', 'salesperson',
   'zone', 'customerCode',
 ];
 
@@ -171,9 +171,9 @@ export function DocumentsTable({
         cell: ({ row }) => docFieldCell(row.original, 'order_id'),
       },
       {
-        id: 'orderType',
-        header: 'Order Type',
-        cell: ({ row }) => docFieldCell(row.original, 'order_type'),
+        id: 'fulfillment',
+        header: 'Fulfillment',
+        cell: ({ row }) => docFieldCell(row.original, 'fulfillment'),
       },
       {
         id: 'phone',
