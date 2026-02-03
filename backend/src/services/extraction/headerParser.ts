@@ -155,7 +155,8 @@ function extractAddressAndFulfillment(
     return { address: null, fulfillmentType: null };
   }
 
-  const fulfillmentPattern = /\s+(Pickup|Delivery|Doorstep\s+Shipping|Full[- ]Service\s+Delivery)\s*[|]?\s*$/i;
+  // Allow trailing OCR artifacts (|, ~, i, etc.) after fulfillment type
+  const fulfillmentPattern = /\s+(Pickup|Delivery|Doorstep\s+Shipping|Full[- ]Service\s+Delivery)\s*[|~i;:.,]?\s*$/i;
   const typeMatch = afterZip.match(fulfillmentPattern);
   const fulfillmentType = normalizeFulfillment(typeMatch?.[1]?.trim() ?? null);
   const rawAddress = afterZip.replace(fulfillmentPattern, '').trim();
