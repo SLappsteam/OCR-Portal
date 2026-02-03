@@ -70,12 +70,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       include: {
         document: {
           include: {
-            batch: {
-              include: {
-                store: true,
-                parentBatch: { select: { id: true } },
-              },
-            },
+            batch: { include: { store: true } },
             documentType: true,
           },
         },
@@ -96,7 +91,6 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       batch_id: ext.document.batch.id,
       batch_reference: ext.document.batch.reference,
       batch_type: ext.document.batch.batch_type,
-      root_batch_id: ext.document.batch.parentBatch?.id ?? ext.document.batch.id,
       created_at: ext.created_at,
     }));
 

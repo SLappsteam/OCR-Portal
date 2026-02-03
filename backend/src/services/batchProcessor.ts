@@ -1,6 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { analyzeTiff, type BatchSection, type AnalyzeResult } from './documentSplitter';
-import { createChildBatch, createPageDocument } from './batchCreator';
+import { createPageDocument } from './batchCreator';
 import { extractSinglePage } from './extraction/extractFields';
 import { classifyPageContent } from './cdrScanner';
 import { logger } from '../utils/logger';
@@ -131,7 +131,7 @@ export async function processTiffScan(batchId: number): Promise<void> {
       return;
     }
 
-    // Set page_count to actual TIFF page count so previews work correctly
+    // Set page_count to actual TIFF page count
     const firstSection = sections[0]!;
     await prisma.batch.update({
       where: { id: batchId },
@@ -141,21 +141,11 @@ export async function processTiffScan(batchId: number): Promise<void> {
       },
     });
 
-    await processSectionPages(
-      batchId, storeNumber, batch.file_path, firstSection
-    );
-
-    for (let i = 1; i < sections.length; i++) {
-      const section = sections[i]!;
-      const childBatch = await createChildBatch(
-        batch, section.documentTypeCode, section.pages.length
-      );
-
+    // Process all sections under one batch - no child batches
+    for (const section of sections) {
       await processSectionPages(
-        childBatch.id, storeNumber, batch.file_path, section
+        batchId, storeNumber, batch.file_path, section
       );
-
-      await updateBatchStatus(childBatch.id, 'completed');
     }
 
     await updateBatchStatus(batchId, 'completed');

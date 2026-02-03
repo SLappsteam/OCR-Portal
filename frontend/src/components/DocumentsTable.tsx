@@ -250,7 +250,7 @@ export function DocumentsTable({
             <tr
               key={row.id}
               className="hover:bg-gray-50 cursor-pointer"
-              onClick={() => onDocumentClick(row.original.root_batch_id, row.original.page_number)}
+              onClick={() => onDocumentClick(row.original.batch.id, row.original.page_number)}
             >
               {row.getVisibleCells().map((cell) => (
                 <td

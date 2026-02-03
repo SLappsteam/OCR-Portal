@@ -34,7 +34,6 @@ export interface DocumentRow {
   page_number: number;
   created_at: string;
   confidence: number | null;
-  root_batch_id: number;
   batch: {
     id: number;
     reference: string | null;

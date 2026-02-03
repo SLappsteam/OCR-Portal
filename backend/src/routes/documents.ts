@@ -54,10 +54,6 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
             id: true,
             reference: true,
             batch_type: true,
-            parent_batch_id: true,
-            parentBatch: {
-              select: { id: true, reference: true, page_count: true },
-            },
             store: true,
           },
         },
@@ -77,9 +73,6 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       raw['extraction_fields'] = extractions?.[0]?.fields ?? null;
       raw['confidence'] = extractions?.[0]?.confidence ?? null;
       delete raw['pageExtractions'];
-      // Add root_batch_id for navigation to original batch with all pages
-      const batch = raw['batch'] as { id: number; parent_batch_id?: number | null; parentBatch?: { id: number } | null };
-      raw['root_batch_id'] = batch.parentBatch?.id ?? batch.id;
       return raw;
     });
     const response: ApiResponse = { success: true, data: serialized };

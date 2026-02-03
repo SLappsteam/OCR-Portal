@@ -50,6 +50,5 @@ export interface PageSearchResult {
   batch_id: number;
   batch_reference: string | null;
   batch_type: string | null;
-  root_batch_id: number;
   created_at: string;
 }
