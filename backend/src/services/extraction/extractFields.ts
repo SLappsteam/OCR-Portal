@@ -5,6 +5,11 @@ import { ocrRecognize } from '../ocrPool';
 import { parseFinsalesPage, calculateConfidence } from './finsalesParser';
 import { parseSummaryText, isSummaryPage } from './summaryParser';
 import { isTicketPage, parseTicketText, calculateTicketConfidence } from './ticketParser';
+import {
+  isTransactionReceipt,
+  parseTransactionReceipt,
+  calculateReceiptConfidence,
+} from './transactionReceiptParser';
 import { scanBarcodeInRegion } from '../barcodeService';
 import { PageExtractionResult } from './types';
 import { logger } from '../../utils/logger';
@@ -81,6 +86,10 @@ export async function extractSinglePage(
       return await tryExtractTicket(activeBuffer, rawText, pageNumber, docTypeCode);
     }
 
+    if (isTransactionReceipt(rawText)) {
+      return buildReceiptResult(rawText, pageNumber);
+    }
+
     return buildDetailResult(rawText, pageNumber, docTypeCode);
   } catch (error) {
     logger.error(`Page extraction failed for ${docTypeCode} page ${pageNumber}:`, error);
@@ -136,6 +145,27 @@ function buildDetailResult(
   return {
     page_number: pageNumber,
     document_type: docTypeCode,
+    fields,
+    confidence,
+    raw_text: rawText,
+  };
+}
+
+function buildReceiptResult(
+  rawText: string,
+  pageNumber: number
+): PageExtractionResult {
+  const fields = parseTransactionReceipt(rawText);
+  const confidence = calculateReceiptConfidence(fields);
+
+  logger.info(
+    `Extracted RECEIPT page ${pageNumber}: confidence=${(confidence * 100).toFixed(0)}%, ` +
+    `order=${fields.order_id}, customer=${fields.customer_name}`
+  );
+
+  return {
+    page_number: pageNumber,
+    document_type: 'RECEIPT',
     fields,
     confidence,
     raw_text: rawText,
