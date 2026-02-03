@@ -5,9 +5,8 @@ import { correctPageImage } from './imageCorrection';
 import { ocrRecognize } from './ocrPool';
 import { isTicketPage, parseTicketText, calculateTicketConfidence } from './extraction/ticketParser';
 import { parseFinsalesPage, calculateConfidence } from './extraction/finsalesParser';
-import { scanBarcodeInRegion } from './barcodeService';
-import { getDocumentTypeByCode } from './barcodeService';
-import { detectManifest, parseManifestOrders } from './manifestDetector';
+import { scanBarcodeInRegion, getDocumentTypeByCode } from './barcodeService';
+import { parseManifestOrders } from './manifestDetector';
 import { logger } from '../utils/logger';
 
 const prisma = new PrismaClient();
@@ -76,36 +75,43 @@ async function ocrAndParse(
   const png = await extractPageAsPng(filePath, page);
   const corrected = await correctPageImage(png);
 
-  // Check for manifest page first (may need 90° rotation)
-  const manifestResult = await detectManifest(corrected);
-  if (manifestResult.isManifest) {
-    const orders = parseManifestOrders(manifestResult.text);
-    return {
-      fields: {
-        orders,
-        order_count: orders.length,
-      },
-      raw_text: manifestResult.text,
-      confidence: manifestResult.confidence / 100,
-      documentType: 'MANIFEST',
-    };
-  }
-
+  // First OCR pass - try normal orientation
   let { text, confidence: ocrConf } = await ocrWithConfidence(corrected);
   let activeBuffer = corrected;
 
+  // If low confidence, try 180° rotation (upside down page)
   if (ocrConf < LOW_CONFIDENCE_THRESHOLD) {
     const flipped = await sharp(corrected).rotate(180).png().toBuffer();
     const flipped$ = await ocrWithConfidence(flipped);
     if (flipped$.confidence > ocrConf + 10) {
+      logger.info(`Page upside-down: conf ${ocrConf.toFixed(1)} vs rotated ${flipped$.confidence.toFixed(1)}`);
       text = flipped$.text;
+      ocrConf = flipped$.confidence;
       activeBuffer = flipped;
+    }
+  }
+
+  // Check for manifest page (landscape tabular data)
+  // Manifests need 90° CCW rotation - try if we see column headers or multiple order IDs
+  if (ocrConf < LOW_CONFIDENCE_THRESHOLD || hasManifestHints(text)) {
+    const rotated90 = await sharp(corrected).rotate(270).png().toBuffer();
+    const rotated$ = await ocrWithConfidence(rotated90);
+    if (rotated$.confidence > ocrConf) {
+      const manifestOrders = parseManifestOrders(rotated$.text);
+      if (manifestOrders.length >= 2) {
+        logger.info(`  Manifest detection: 90° CCW rotation improved OCR`);
+        return {
+          fields: { orders: manifestOrders, order_count: manifestOrders.length },
+          raw_text: rotated$.text,
+          confidence: rotated$.confidence / 100,
+          documentType: 'MANIFEST',
+        };
+      }
     }
   }
 
   // Check if content matches invoice patterns (sales tickets, financing docs)
   if (!isInvoiceContent(text)) {
-    // Unknown document type - still store extraction with minimal data
     return {
       fields: {},
       raw_text: text,
@@ -133,6 +139,13 @@ async function ocrAndParse(
     confidence: calculateConfidence(fields),
     documentType: 'INVOICE',
   };
+}
+
+// Quick check for manifest hints before trying 90° rotation
+function hasManifestHints(text: string): boolean {
+  const orderPattern = /\b\d{7,}[A-Z]{1,2}\b/g;
+  const matches = text.match(orderPattern);
+  return (matches?.length ?? 0) >= 2;
 }
 
 async function ocrWithConfidence(

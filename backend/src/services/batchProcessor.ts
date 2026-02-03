@@ -1,7 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { analyzeTiff, type BatchSection, type AnalyzeResult } from './documentSplitter';
 import { createPageDocument } from './batchCreator';
-import { extractSinglePage } from './extraction/extractFields';
 import { classifyPageContent } from './cdrScanner';
 import { logger } from '../utils/logger';
 
@@ -24,48 +23,20 @@ async function updateBatchStatus(
   });
 }
 
-async function extractAndStorePage(
+async function storeCoversheetExtraction(
   docId: number,
-  filePath: string,
   pageNumber: number,
-  docTypeCode: string,
-  isCoversheet: boolean
+  batchType: string
 ): Promise<void> {
-  try {
-    if (isCoversheet) {
-      await prisma.pageExtraction.create({
-        data: {
-          document_id: docId,
-          page_number: pageNumber,
-          fields: { document_type: docTypeCode } as Prisma.JsonObject,
-          raw_text: '',
-          confidence: 1.0,
-        },
-      });
-      return;
-    }
-
-    const result = await extractSinglePage(
-      filePath, pageNumber, docTypeCode
-    );
-
-    if (result) {
-      await prisma.pageExtraction.create({
-        data: {
-          document_id: docId,
-          page_number: result.page_number,
-          fields: {
-            document_type: docTypeCode,
-            ...result.fields,
-          } as unknown as Prisma.JsonObject,
-          raw_text: result.raw_text,
-          confidence: result.confidence,
-        },
-      });
-    }
-  } catch (error) {
-    logger.error(`Page extraction failed for doc ${docId} page ${pageNumber}:`, error);
-  }
+  await prisma.pageExtraction.create({
+    data: {
+      document_id: docId,
+      page_number: pageNumber,
+      fields: { batch_type: batchType } as Prisma.JsonObject,
+      raw_text: '',
+      confidence: 1.0,
+    },
+  });
 }
 
 async function processSectionPages(
@@ -78,17 +49,15 @@ async function processSectionPages(
     const page = section.pages[i]!;
     const isCoversheet = i === 0 && section.documentTypeCode !== 'UNCLASSIFIED';
 
-    // Don't pass batch type as document type - they're now separate concepts
-    // Document type will be set by classifyPageContent()
     const docId = await createPageDocument(
       batchId, storeNumber, page, undefined, isCoversheet
     );
 
-    await extractAndStorePage(
-      docId, filePath, page, section.documentTypeCode, isCoversheet
-    );
-
-    if (!isCoversheet) {
+    if (isCoversheet) {
+      // Coversheets just store batch type, no OCR needed
+      await storeCoversheetExtraction(docId, page, section.documentTypeCode);
+    } else {
+      // classifyPageContent does OCR, classification, and extraction in one pass
       await classifyPageContent(docId, filePath, page);
     }
 
