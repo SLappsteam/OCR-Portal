@@ -7,6 +7,7 @@ import { isTicketPage, parseTicketText, calculateTicketConfidence } from './extr
 import { parseFinsalesPage, calculateConfidence } from './extraction/finsalesParser';
 import { scanBarcodeInRegion } from './barcodeService';
 import { getDocumentTypeByCode } from './barcodeService';
+import { detectManifest, parseManifestOrders } from './manifestDetector';
 import { logger } from '../utils/logger';
 
 const prisma = new PrismaClient();
@@ -78,6 +79,22 @@ async function ocrAndParse(
 ): Promise<ParsedPage | null> {
   const png = await extractPageAsPng(filePath, page);
   const corrected = await correctPageImage(png);
+
+  // Check for manifest page first (may need 90° rotation)
+  const manifestResult = await detectManifest(corrected);
+  if (manifestResult.isManifest) {
+    const orders = parseManifestOrders(manifestResult.text);
+    return {
+      fields: {
+        orders,
+        order_count: orders.length,
+      },
+      raw_text: manifestResult.text,
+      confidence: manifestResult.confidence / 100,
+      documentType: 'MANIFEST',
+    };
+  }
+
   let { text, confidence: ocrConf } = await ocrWithConfidence(corrected);
   let activeBuffer = corrected;
 

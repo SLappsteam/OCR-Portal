@@ -9,6 +9,7 @@ import {
   Landmark,
   HelpCircle,
   FileQuestion,
+  ClipboardList,
 } from 'lucide-react';
 
 export const docTypeIcons: Record<string, { icon: React.ElementType; color: string }> = {
@@ -23,6 +24,7 @@ export const docTypeIcons: Record<string, { icon: React.ElementType; color: stri
   FINTRAN: { icon: CreditCard, color: 'bg-indigo-100 text-indigo-600' },
   LOFTFIN: { icon: CreditCard, color: 'bg-violet-100 text-violet-600' },
   WFDEP: { icon: Landmark, color: 'bg-yellow-100 text-yellow-600' },
+  MANIFEST: { icon: ClipboardList, color: 'bg-cyan-100 text-cyan-600' },
   OTHER: { icon: FileQuestion, color: 'bg-gray-100 text-gray-600' },
   UNCLASSIFIED: { icon: HelpCircle, color: 'bg-gray-100 text-gray-400' },
 };
