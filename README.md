@@ -87,9 +87,21 @@ The frontend will be available at `http://localhost:5173`.
 ### Backend
 
 - `npm run dev` - Start development server with hot reload
+- `npm run dev:restart` - Safely kill existing server and restart
+- `npm run stop` - Stop the running server
 - `npm run build` - Build for production
 - `npm start` - Start production server
 - `npm run lint` - Run ESLint
+
+### Process Management
+
+The backend uses port-based detection to manage server instances:
+
+- If the port is already in use, `npm run dev` will warn you with the PID
+- Use `npm run dev:restart` to safely kill only the process on the port and restart
+- Use `npm run stop` to kill the server without restarting
+
+**Note:** These scripts kill only the specific process using the port, not the entire process tree. This prevents accidentally terminating other processes (like IDE terminals or Claude Code sessions).
 
 ### Frontend
 

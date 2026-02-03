@@ -1,43 +1,76 @@
-import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'fs';
-import path from 'path';
+import { execSync } from 'child_process';
 import { logger } from './logger';
 
-const LOCK_FILE = path.join(__dirname, '..', '..', 'server.lock');
+const DEFAULT_PORT = 3000;
 
-function isProcessRunning(pid: number): boolean {
+/**
+ * Finds the PID of the process using a given port (Windows-only)
+ */
+function findProcessOnPort(port: number): number | null {
   try {
-    process.kill(pid, 0);
+    const result = execSync(`netstat -ano | findstr :${port} | findstr LISTENING`, {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    const match = result.trim().split('\n')[0]?.match(/\s+(\d+)\s*$/);
+    return match ? parseInt(match[1], 10) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Kills a process by PID (single process only, no tree-kill)
+ */
+function killProcess(pid: number): boolean {
+  try {
+    execSync(`taskkill /PID ${pid} /F`, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
     return true;
   } catch {
     return false;
   }
 }
 
-export function acquireLock(): void {
-  if (existsSync(LOCK_FILE)) {
-    const stalePid = parseInt(readFileSync(LOCK_FILE, 'utf-8').trim(), 10);
-    if (!isNaN(stalePid) && isProcessRunning(stalePid)) {
-      logger.error(
-        `Another server instance is already running (PID ${stalePid}). ` +
-        `Kill it first: taskkill /PID ${stalePid} /F /T`
-      );
+/**
+ * Check if port is available, optionally kill existing process
+ */
+export function ensurePortAvailable(port?: number, autoKill = false): void {
+  const targetPort = port ?? parseInt(process.env['PORT'] ?? String(DEFAULT_PORT), 10);
+  const existingPid = findProcessOnPort(targetPort);
+
+  if (!existingPid) {
+    return; // Port is free
+  }
+
+  if (autoKill) {
+    logger.warn(`Port ${targetPort} in use by PID ${existingPid}, killing...`);
+    if (killProcess(existingPid)) {
+      logger.info(`Killed process ${existingPid}`);
+      // Give it a moment to release the port
+      execSync('timeout /t 1 /nobreak >nul', { stdio: 'ignore' });
+    } else {
+      logger.error(`Failed to kill process ${existingPid}`);
       process.exit(1);
     }
-    logger.warn(`Removing stale lock file (PID ${stalePid} is not running)`);
+  } else {
+    logger.warn(
+      `Port ${targetPort} is already in use by PID ${existingPid}. ` +
+      `Run: taskkill /PID ${existingPid} /F`
+    );
+    // Don't exit - let the server try to bind and fail with EADDRINUSE
+    // This gives better error handling at the Express level
   }
-  writeFileSync(LOCK_FILE, String(process.pid), 'utf-8');
-  logger.info(`Process lock acquired (PID ${process.pid})`);
+}
+
+// Legacy exports for backwards compatibility (no-ops)
+export function acquireLock(): void {
+  // Deprecated - now a no-op
+  // Port conflict is handled by Express EADDRINUSE
 }
 
 export function releaseLock(): void {
-  try {
-    if (existsSync(LOCK_FILE)) {
-      const lockedPid = parseInt(readFileSync(LOCK_FILE, 'utf-8').trim(), 10);
-      if (lockedPid === process.pid) {
-        unlinkSync(LOCK_FILE);
-      }
-    }
-  } catch {
-    // Best-effort cleanup
-  }
+  // Deprecated - now a no-op
 }
