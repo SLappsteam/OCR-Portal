@@ -2,17 +2,19 @@ import { FinsalesData } from './types';
 
 export const STREET_SUFFIX =
   '(?:Street|Court|Avenue|Boulevard|Drive|Road|Lane|Place|Circle|Highway|Parkway|Trail' +
-  '|St\\.?|Ave\\.?|Blvd\\.?|Dr\\.?|Rd\\.?|Way|Ln\\.?|Ct\\.?|Pl\\.?|Cir\\.?|Hwy\\.?|Pkwy\\.?|Trl\\.?)';
+  '|St\\.?|Ave\\.?|B[il1]vd\\.?|Dr\\.?|Rd\\.?|Way|Ln\\.?|Ct\\.?|Pl\\.?|Cir\\.?|Hwy\\.?|Pkwy\\.?|Trl\\.?)';
 
 const HEADER_LINE_PATTERN = /TYPE\s*:.*STAT\s*[.:]/i;
+const CREDIT_LINE_PATTERN = /CREDIT\s*:\s*\d/i;
 
 export function extractHeader(rawText: string): Partial<FinsalesData> {
   const { address, fulfillmentType } = extractAddressAndFulfillment(rawText);
   const billToAddress = address ?? extractBillToAddress(rawText);
   const cityStateZip = extractCityStateZip(rawText) ?? extractBillToCityStateZip(rawText);
+  const isCredit = CREDIT_LINE_PATTERN.test(rawText);
 
   return {
-    order_type: fulfillmentType,
+    order_type: fulfillmentType ?? (isCredit ? 'CREDIT' : null),
     order_id: extractOrderId(rawText),
     customer_name: extractCustomerName(rawText),
     address: billToAddress,
@@ -27,11 +29,23 @@ export function extractHeader(rawText: string): Partial<FinsalesData> {
 }
 
 function extractOrderId(text: string): string | null {
-  const numberMatch = text.match(/(?:NUMBER|RETURN)\s*:\s*(\d\S+)/i);
+  // Primary pattern: NUMBER/RETURN/CREDIT : <order_id>
+  // OCR-tolerant: "NUMBER" often misread as "MBER", "BER", "UMBER", etc.
+  const numberMatch = text.match(/(?:N?U?M?BER|NUMBER|RETURN|CREDIT)\s*:\s*(\d\S+)/i);
   if (numberMatch?.[1]) return numberMatch[1].trim();
 
   const orderMatch = text.match(/Order\s*#\s*:?\s*(\d\S+)/i);
-  return orderMatch?.[1]?.trim() ?? null;
+  if (orderMatch?.[1]) return orderMatch[1].trim();
+
+  // Fallback: look for order ID pattern in upper portion of document
+  // Order IDs typically: digits followed by letters+digits (e.g., 0302578ND76)
+  const lines = text.split('\n').slice(0, 10);
+  for (const line of lines) {
+    const fallback = line.match(/:\s*(\d{5,}\w{2,})/);
+    if (fallback?.[1]) return fallback[1].trim();
+  }
+
+  return null;
 }
 
 function extractCustomerName(text: string): string | null {
@@ -42,11 +56,21 @@ function extractCustomerName(text: string): string | null {
   const match = text.match(primary);
   if (match?.[1]) return match[1].trim();
 
-  // Fallback: find header line via TYPE: + STAT:, extract name after street suffix
+  // Credit pages: name between street suffix and "CREDIT:"
+  const creditPrimary = new RegExp(
+    `${STREET_SUFFIX}\\s+([A-Z][A-Za-z /.'()-]+?)\\s+CREDIT\\s*:`, 'i'
+  );
+  const creditMatch = text.match(creditPrimary);
+  if (creditMatch?.[1]) return creditMatch[1].trim();
+
+  // Fallback: find header line via TYPE:...STAT: or CREDIT:, extract name
   const lines = text.split('\n');
-  const idx = lines.findIndex((l) => HEADER_LINE_PATTERN.test(l));
+  let idx = lines.findIndex((l) => HEADER_LINE_PATTERN.test(l));
+  if (idx < 0) {
+    idx = lines.findIndex((l) => CREDIT_LINE_PATTERN.test(l));
+  }
   if (idx >= 0) {
-    const before = (lines[idx] ?? '').split(/TYPE\s*:/i)[0] ?? '';
+    const before = (lines[idx] ?? '').split(/(?:TYPE|CREDIT)\s*:/i)[0] ?? '';
     const afterStreet = before.replace(new RegExp(`^.*${STREET_SUFFIX}\\s+`, 'i'), '');
     const nameMatch = afterStreet.match(/^([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*)/);
     if (nameMatch?.[1]) return nameMatch[1].trim();
