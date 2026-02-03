@@ -49,8 +49,10 @@ async function processSectionPages(
     const page = section.pages[i]!;
     const isCoversheet = i === 0 && section.documentTypeCode !== 'UNCLASSIFIED';
 
+    // Coversheets get COVERSHEET document type, others get classified later
+    const docTypeCode = isCoversheet ? 'COVERSHEET' : undefined;
     const docId = await createPageDocument(
-      batchId, storeNumber, page, undefined, isCoversheet
+      batchId, storeNumber, page, docTypeCode, isCoversheet
     );
 
     if (isCoversheet) {

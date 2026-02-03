@@ -2,10 +2,12 @@ import {
   FileText,
   ClipboardList,
   HelpCircle,
+  ScanBarcode,
 } from 'lucide-react';
 
 // Document types - classify page content (not batch type)
 export const docTypeIcons: Record<string, { icon: React.ElementType; color: string }> = {
+  COVERSHEET: { icon: ScanBarcode, color: 'bg-purple-100 text-purple-600' },
   INVOICE: { icon: FileText, color: 'bg-green-100 text-green-600' },
   MANIFEST: { icon: ClipboardList, color: 'bg-cyan-100 text-cyan-600' },
   UNKNOWN: { icon: HelpCircle, color: 'bg-gray-100 text-gray-400' },
