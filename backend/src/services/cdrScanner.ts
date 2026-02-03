@@ -32,12 +32,8 @@ function isFinsalesContent(text: string): boolean {
   return FINSALES_HEADER.test(text) || isTicketPage(text) || CREDIT_HEADER.test(text);
 }
 
-function detectDocumentType(text: string): 'FINTRAN' | 'FINSALES' | null {
-  // Check FINSALES first - it has more specific header patterns
-  // FINSALES tickets may mention "FINANCED AMOUNT" but are still sales tickets
-  if (isFinsalesContent(text)) return 'FINSALES';
-  if (isFintranContent(text)) return 'FINTRAN';
-  return null;
+function isInvoiceContent(text: string): boolean {
+  return isFinsalesContent(text) || isFintranContent(text);
 }
 
 export async function classifyPageContent(
@@ -107,8 +103,16 @@ async function ocrAndParse(
     }
   }
 
-  const docType = detectDocumentType(text);
-  if (!docType) return null;
+  // Check if content matches invoice patterns (sales tickets, financing docs)
+  if (!isInvoiceContent(text)) {
+    // Unknown document type - still store extraction with minimal data
+    return {
+      fields: {},
+      raw_text: text,
+      confidence: 0,
+      documentType: 'UNKNOWN',
+    };
+  }
 
   if (isTicketPage(text)) {
     const fields = parseTicketText(text);
@@ -118,7 +122,7 @@ async function ocrAndParse(
       fields,
       raw_text: text,
       confidence: calculateTicketConfidence(fields),
-      documentType: 'FINSALES',
+      documentType: 'INVOICE',
     };
   }
 
@@ -127,7 +131,7 @@ async function ocrAndParse(
     fields,
     raw_text: text,
     confidence: calculateConfidence(fields),
-    documentType: docType,
+    documentType: 'INVOICE',
   };
 }
 

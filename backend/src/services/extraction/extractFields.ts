@@ -9,7 +9,8 @@ import { scanBarcodeInRegion } from '../barcodeService';
 import { PageExtractionResult } from './types';
 import { logger } from '../../utils/logger';
 
-const SUPPORTED_DOC_TYPES = ['FINSALES', 'FINTRAN'];
+// Batch types that support invoice extraction
+const INVOICE_BATCH_TYPES = ['FINSALES', 'FINTRAN', 'CDR', 'LOFTFIN'];
 const LOW_CONFIDENCE_THRESHOLD = 50;
 const PAGE_CONCURRENCY = 4;
 
@@ -17,9 +18,9 @@ export async function extractAllPages(
   filePath: string,
   pageStart: number,
   pageEnd: number,
-  docTypeCode: string
+  batchTypeCode: string
 ): Promise<PageExtractionResult[]> {
-  if (!SUPPORTED_DOC_TYPES.includes(docTypeCode)) {
+  if (!INVOICE_BATCH_TYPES.includes(batchTypeCode)) {
     return [];
   }
 
@@ -34,7 +35,7 @@ export async function extractAllPages(
     const batchResults = await Promise.all(
       batch.map((page) => {
         const isSummary = page === pageStart + 1;
-        return extractSinglePage(filePath, page, docTypeCode, isSummary);
+        return extractSinglePage(filePath, page, batchTypeCode, isSummary);
       })
     );
     for (const r of batchResults) {

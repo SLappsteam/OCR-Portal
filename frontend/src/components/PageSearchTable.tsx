@@ -66,15 +66,15 @@ export function PageSearchTable({
         accessorKey: 'document_type_name',
         header: 'Type',
         cell: ({ row }) => {
-          const code = row.original.document_type_code ?? 'UNCLASSIFIED';
-          const config = docTypeIcons[code] ?? docTypeIcons['UNCLASSIFIED']!;
+          const code = row.original.document_type_code ?? 'UNKNOWN';
+          const config = docTypeIcons[code] ?? docTypeIcons['UNKNOWN']!;
           const Icon = config!.icon;
           return (
             <div className="flex items-center gap-3">
               <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center ${config!.color}`}>
                 <Icon size={16} />
               </div>
-              <span>{row.original.document_type_name ?? 'Unclassified'}</span>
+              <span>{row.original.document_type_name ?? 'Unknown'}</span>
             </div>
           );
         },

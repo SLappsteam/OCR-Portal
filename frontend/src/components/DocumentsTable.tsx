@@ -84,15 +84,15 @@ export function DocumentsTable({
         accessorKey: 'documentType.name',
         header: 'Document Type',
         cell: ({ row }) => {
-          const code = row.original.documentType?.code ?? 'UNCLASSIFIED';
-          const config = docTypeIcons[code] ?? docTypeIcons['UNCLASSIFIED']!;
+          const code = row.original.documentType?.code ?? 'UNKNOWN';
+          const config = docTypeIcons[code] ?? docTypeIcons['UNKNOWN']!;
           const Icon = config!.icon;
           return (
             <div className="flex items-center gap-2">
               <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center ${config!.color}`}>
                 <Icon size={16} />
               </div>
-              <span>{row.original.documentType?.name ?? 'Unclassified'}</span>
+              <span>{row.original.documentType?.name ?? 'Unknown'}</span>
             </div>
           );
         },

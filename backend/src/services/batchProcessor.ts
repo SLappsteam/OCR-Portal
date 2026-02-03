@@ -78,8 +78,10 @@ async function processSectionPages(
     const page = section.pages[i]!;
     const isCoversheet = i === 0 && section.documentTypeCode !== 'UNCLASSIFIED';
 
+    // Don't pass batch type as document type - they're now separate concepts
+    // Document type will be set by classifyPageContent()
     const docId = await createPageDocument(
-      batchId, storeNumber, page, section.documentTypeCode, isCoversheet
+      batchId, storeNumber, page, undefined, isCoversheet
     );
 
     await extractAndStorePage(
