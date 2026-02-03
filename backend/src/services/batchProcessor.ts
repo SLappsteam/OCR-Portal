@@ -1,7 +1,8 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { analyzeTiff } from './documentSplitter';
-import { getDocumentTypeByCode } from './barcodeService';
-import { extractAllPages } from './extraction';
+import { analyzeTiff, type BatchSection } from './documentSplitter';
+import { createChildBatch, createPageDocument } from './batchCreator';
+import { extractSinglePage } from './extraction/extractFields';
+import { classifyPageContent } from './cdrScanner';
 import { logger } from '../utils/logger';
 
 const prisma = new PrismaClient();
@@ -23,79 +24,80 @@ async function updateBatchStatus(
   });
 }
 
-async function createDocumentRecord(
-  batchId: number,
-  storeNumber: string,
-  boundary: {
-    documentTypeCode: string;
-    startPage: number;
-    endPage: number;
-  }
-): Promise<number> {
-  const docType = await getDocumentTypeByCode(boundary.documentTypeCode);
-
-  const doc = await prisma.document.create({
-    data: {
-      batch_id: batchId,
-      document_type_id: docType?.id ?? null,
-      page_start: boundary.startPage,
-      page_end: boundary.endPage,
-      status: 'pending',
-    },
-  });
-
-  const reference = `${storeNumber}-${doc.id}`;
-  await prisma.document.update({
-    where: { id: doc.id },
-    data: { reference },
-  });
-
-  const pageCount = boundary.endPage - boundary.startPage + 1;
-  logger.info(`  Created document ${reference}: type=${boundary.documentTypeCode}, pages ${boundary.startPage}-${boundary.endPage} (${pageCount} pages)`);
-
-  return doc.id;
-}
-
-async function extractAndStorePageData(
+async function extractAndStorePage(
   docId: number,
   filePath: string,
-  boundary: { documentTypeCode: string; startPage: number; endPage: number }
+  pageNumber: number,
+  docTypeCode: string,
+  isCoversheet: boolean
 ): Promise<void> {
   try {
-    const pages = await extractAllPages(
-      filePath,
-      boundary.startPage,
-      boundary.endPage,
-      boundary.documentTypeCode
+    if (isCoversheet) {
+      await prisma.pageExtraction.create({
+        data: {
+          document_id: docId,
+          page_number: pageNumber,
+          fields: { document_type: docTypeCode } as Prisma.JsonObject,
+          raw_text: '',
+          confidence: 1.0,
+        },
+      });
+      return;
+    }
+
+    const result = await extractSinglePage(
+      filePath, pageNumber, docTypeCode
     );
 
-    const coversheetRow = {
-      document_id: docId,
-      page_number: boundary.startPage,
-      fields: { document_type: boundary.documentTypeCode } as unknown as Prisma.JsonObject,
-      raw_text: '',
-      confidence: 1.0,
-    };
-
-    const contentRows = pages.map((p) => ({
-      document_id: docId,
-      page_number: p.page_number,
-      fields: p.fields as unknown as Prisma.JsonObject,
-      raw_text: p.raw_text,
-      confidence: p.confidence,
-    }));
-
-    await prisma.pageExtraction.createMany({
-      data: [coversheetRow, ...contentRows],
-    });
-
-    logger.info(`Stored ${contentRows.length + 1} page extractions for doc ${docId} (1 coversheet + ${contentRows.length} content)`);
+    if (result) {
+      await prisma.pageExtraction.create({
+        data: {
+          document_id: docId,
+          page_number: result.page_number,
+          fields: {
+            document_type: docTypeCode,
+            ...result.fields,
+          } as unknown as Prisma.JsonObject,
+          raw_text: result.raw_text,
+          confidence: result.confidence,
+        },
+      });
+    }
   } catch (error) {
-    logger.error(`Page extraction failed for doc ${docId}:`, error);
+    logger.error(`Page extraction failed for doc ${docId} page ${pageNumber}:`, error);
   }
 }
 
-export async function processBatch(batchId: number): Promise<void> {
+async function processSectionPages(
+  batchId: number,
+  storeNumber: string,
+  filePath: string,
+  section: BatchSection
+): Promise<void> {
+  for (let i = 0; i < section.pages.length; i++) {
+    const page = section.pages[i]!;
+    const isCoversheet = i === 0 && section.documentTypeCode !== 'UNCLASSIFIED';
+
+    const docId = await createPageDocument(
+      batchId, storeNumber, page, section.documentTypeCode
+    );
+
+    await extractAndStorePage(
+      docId, filePath, page, section.documentTypeCode, isCoversheet
+    );
+
+    if (!isCoversheet) {
+      await classifyPageContent(docId, filePath, page);
+    }
+
+    await prisma.document.update({
+      where: { id: docId },
+      data: { status: 'completed' },
+    });
+  }
+}
+
+export async function processTiffScan(batchId: number): Promise<void> {
   logger.info(`Starting batch processing for batch ID: ${batchId}`);
 
   const batch = await prisma.batch.findUnique({
@@ -107,45 +109,62 @@ export async function processBatch(batchId: number): Promise<void> {
     throw new Error(`Batch ${batchId} not found`);
   }
 
-  const storeNumber = batch.store.store_number;
-
   if (batch.status === 'processing') {
     throw new Error(`Batch ${batchId} is already being processed`);
   }
 
+  const storeNumber = batch.store.store_number;
   const startTime = Date.now();
 
   try {
     await updateBatchStatus(batchId, 'processing');
     logger.info(`Batch ${batchId}: store=${storeNumber}, file=${batch.file_name}`);
 
-    const boundaries = await analyzeTiff(batch.file_path);
+    const sections = await analyzeTiff(batch.file_path);
 
-    for (const boundary of boundaries) {
-      if (boundary) {
-        const docId = await createDocumentRecord(batchId, storeNumber, boundary);
-        await extractAndStorePageData(docId, batch.file_path, boundary);
-      }
+    if (sections.length === 0) {
+      await prisma.batch.update({
+        where: { id: batchId },
+        data: { page_count: 0 },
+      });
+      await updateBatchStatus(batchId, 'completed');
+      return;
     }
 
-    const totalPages = boundaries.reduce(
-      (sum, b) => sum + (b.endPage - b.startPage + 1),
-      0
-    );
-
+    // Set page_count early so previews work during processing
+    const totalPages = sections.reduce((sum, s) => sum + s.pages.length, 0);
+    const firstSection = sections[0]!;
     await prisma.batch.update({
       where: { id: batchId },
-      data: { page_count: totalPages },
+      data: {
+        batch_type: firstSection.documentTypeCode,
+        page_count: totalPages,
+      },
     });
 
-    await prisma.document.updateMany({
-      where: { batch_id: batchId },
-      data: { status: 'completed' },
-    });
+    await processSectionPages(
+      batchId, storeNumber, batch.file_path, firstSection
+    );
+
+    for (let i = 1; i < sections.length; i++) {
+      const section = sections[i]!;
+      const childBatch = await createChildBatch(
+        batch, section.documentTypeCode, section.pages.length
+      );
+
+      await processSectionPages(
+        childBatch.id, storeNumber, batch.file_path, section
+      );
+
+      await updateBatchStatus(childBatch.id, 'completed');
+    }
 
     await updateBatchStatus(batchId, 'completed');
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    logger.info(`Batch ${batchId} completed: ${boundaries.length} documents, ${totalPages} pages in ${elapsed}s`);
+    logger.info(
+      `Batch ${batchId} completed: ${sections.length} sections, ` +
+      `${totalPages} total pages in ${elapsed}s`
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
