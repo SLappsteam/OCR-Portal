@@ -173,8 +173,10 @@ function extractCityStateZip(text: string): string | null {
 function extractPhone(text: string): string | null {
   const phonePattern = /(\(?\d{3}\)?\s*[-.]?\s*\d{3}\s*[-.]?\s*\d{4})/;
 
-  const mobile = text.match(new RegExp(`M\\/P[;:]\\s*${phonePattern.source}`));
-  const sp = text.match(new RegExp(`S\\/P[;:]\\s*${phonePattern.source}`));
+  // Mobile: M/P or MIP
+  const mobile = text.match(new RegExp(`(?:M\\/P|MIP)[;:]\\s*${phonePattern.source}`));
+  // Secondary: S/P or SIP
+  const sp = text.match(new RegExp(`(?:S\\/P|SIP)[;:]\\s*${phonePattern.source}`));
   const secondary = text.match(new RegExp(`Secondary\\s+Phone:\\s*${phonePattern.source}`, 'i'));
 
   const primary = mobile?.[1]?.trim() ?? null;
