@@ -130,6 +130,13 @@ function getBillToBlock(text: string): string[] {
   return [];
 }
 
+function normalizeFulfillment(value: string | null): string | null {
+  if (!value) return null;
+  const upper = value.toUpperCase().replace(/\s+/g, ' ');
+  if (upper === 'FULL SERVICE DELIVERY') return 'FULL-SERVICE DELIVERY';
+  return upper;
+}
+
 function extractAddressAndFulfillment(
   text: string
 ): { address: string | null; fulfillmentType: string | null } {
@@ -147,9 +154,10 @@ function extractAddressAndFulfillment(
     return { address: null, fulfillmentType: null };
   }
 
-  const typeMatch = afterZip.match(/\s+(Pickup|Delivery)\s*[|]?\s*$/i);
-  const fulfillmentType = typeMatch?.[1]?.trim() ?? null;
-  const rawAddress = afterZip.replace(/\s*(Pickup|Delivery)\s*[|]?\s*$/i, '').trim();
+  const fulfillmentPattern = /\s+(Pickup|Delivery|Doorstep\s+Shipping|Full[- ]Service\s+Delivery)\s*[|]?\s*$/i;
+  const typeMatch = afterZip.match(fulfillmentPattern);
+  const fulfillmentType = normalizeFulfillment(typeMatch?.[1]?.trim() ?? null);
+  const rawAddress = afterZip.replace(fulfillmentPattern, '').trim();
   const address = rawAddress.replace(/[\s\\|«»<>]+$/, '').trim() || null;
   return { address, fulfillmentType };
 }
