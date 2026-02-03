@@ -50,15 +50,16 @@ function extractOrderId(text: string): string | null {
 
 function extractCustomerName(text: string): string | null {
   // Primary: name between store address suffix and "ORDER TYPE:" on same line
+  // Use word boundary \b to avoid matching "st" in "West" as "St"
   const primary = new RegExp(
-    `${STREET_SUFFIX}\\s+([A-Z][A-Za-z /.'()-]+?)\\s+(?:NA\\s+)?ORDER\\s+TYPE`, 'i'
+    `\\b${STREET_SUFFIX}\\b\\s+([A-Z][A-Za-z /.'()-]+?)\\s+(?:NA\\s+)?ORDER\\s+TYPE`, 'i'
   );
   const match = text.match(primary);
   if (match?.[1]) return match[1].trim();
 
   // Credit pages: name between street suffix and "CREDIT:"
   const creditPrimary = new RegExp(
-    `${STREET_SUFFIX}\\s+([A-Z][A-Za-z /.'()-]+?)\\s+CREDIT\\s*:`, 'i'
+    `\\b${STREET_SUFFIX}\\b\\s+([A-Z][A-Za-z /.'()-]+?)\\s+CREDIT\\s*:`, 'i'
   );
   const creditMatch = text.match(creditPrimary);
   if (creditMatch?.[1]) return creditMatch[1].trim();
@@ -71,7 +72,7 @@ function extractCustomerName(text: string): string | null {
   }
   if (idx >= 0) {
     const before = (lines[idx] ?? '').split(/(?:TYPE|CREDIT)\s*:/i)[0] ?? '';
-    const afterStreet = before.replace(new RegExp(`^.*${STREET_SUFFIX}\\s+`, 'i'), '');
+    const afterStreet = before.replace(new RegExp(`^.*\\b${STREET_SUFFIX}\\b\\s+`, 'i'), '');
     const nameMatch = afterStreet.match(/^([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*)/);
     if (nameMatch?.[1]) return nameMatch[1].trim();
   }
