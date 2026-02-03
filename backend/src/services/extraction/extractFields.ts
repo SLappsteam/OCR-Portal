@@ -3,7 +3,7 @@ import { extractPageAsPng } from '../tiffService';
 import { correctPageImage } from '../imageCorrection';
 import { ocrRecognize } from '../ocrPool';
 import { parseFinsalesPage, calculateConfidence } from './finsalesParser';
-import { parseSummaryText, isSummaryPage } from './summaryParser';
+import { parseSummaryText, isSummaryPage, SummaryOrder } from './summaryParser';
 import { isTicketPage, parseTicketText, calculateTicketConfidence } from './ticketParser';
 import {
   isTransactionReceipt,
@@ -90,6 +90,10 @@ export async function extractSinglePage(
       return buildReceiptResult(rawText, pageNumber);
     }
 
+    if (isSummaryPage(rawText)) {
+      return buildSummaryResult(rawText, pageNumber, docTypeCode);
+    }
+
     return buildDetailResult(rawText, pageNumber, docTypeCode);
   } catch (error) {
     logger.error(`Page extraction failed for ${docTypeCode} page ${pageNumber}:`, error);
@@ -167,6 +171,27 @@ function buildReceiptResult(
     page_number: pageNumber,
     document_type: 'RECEIPT',
     fields,
+    confidence,
+    raw_text: rawText,
+  };
+}
+
+function buildSummaryResult(
+  rawText: string,
+  pageNumber: number,
+  docTypeCode: string
+): PageExtractionResult {
+  const orders = parseSummaryText(rawText);
+  const confidence = Math.min(orders.length / 5, 1);
+
+  logger.info(
+    `Extracted ${docTypeCode} manifest page ${pageNumber}: ${orders.length} orders`
+  );
+
+  return {
+    page_number: pageNumber,
+    document_type: docTypeCode,
+    fields: { orders } as unknown as PageExtractionResult['fields'],
     confidence,
     raw_text: rawText,
   };
