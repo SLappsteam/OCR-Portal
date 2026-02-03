@@ -212,7 +212,7 @@ function extractOrderType(text: string): string | null {
 }
 
 function extractZone(text: string): string | null {
-  const match = text.match(/ZONE\s*:?\s*(\d+)/i);
+  const match = text.match(/ZONE\s*:?\s*(\w+)/i);
   return match?.[1]?.trim() ?? null;
 }
 
