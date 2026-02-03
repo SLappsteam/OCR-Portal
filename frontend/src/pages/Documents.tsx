@@ -73,15 +73,24 @@ export function Documents() {
     }
   }, [filters, fieldFilters]);
 
-  const handlePageResultClick = (documentId: number, pageNumber: number) => {
-    navigate(`/documents/${documentId}?page=${pageNumber}`);
+  const handleDocumentClick = (batchId: number, pageNumber: number) => {
+    navigate(`/batches/${batchId}?page=${pageNumber}`);
+  };
+
+  const handlePageResultClick = (batchId: number, pageNumber: number) => {
+    navigate(`/batches/${batchId}?page=${pageNumber}`);
   };
 
   const isSearchMode = Boolean(filters.search);
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-gray-900">Documents</h1>
+      <div>
+        <h1 className="text-xl font-semibold text-gray-900">Documents</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Information is automatically extracted from uploaded documents and may contain errors. Please verify before use.
+        </p>
+      </div>
 
       <SearchFilterBar
         searchInput={searchInput}
@@ -116,7 +125,7 @@ export function Documents() {
             documents={documents}
             sorting={sorting}
             onSortingChange={setSorting}
-            onPageClick={handlePageResultClick}
+            onDocumentClick={handleDocumentClick}
           />
         )}
       </div>
