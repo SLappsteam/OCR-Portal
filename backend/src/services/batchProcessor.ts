@@ -1,5 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { analyzeTiff, type BatchSection } from './documentSplitter';
+import { analyzeTiff, type BatchSection, type AnalyzeResult } from './documentSplitter';
 import { createChildBatch, createPageDocument } from './batchCreator';
 import { extractSinglePage } from './extraction/extractFields';
 import { classifyPageContent } from './cdrScanner';
@@ -120,25 +120,24 @@ export async function processTiffScan(batchId: number): Promise<void> {
     await updateBatchStatus(batchId, 'processing');
     logger.info(`Batch ${batchId}: store=${storeNumber}, file=${batch.file_name}`);
 
-    const sections = await analyzeTiff(batch.file_path);
+    const { sections, totalPageCount } = await analyzeTiff(batch.file_path);
 
     if (sections.length === 0) {
       await prisma.batch.update({
         where: { id: batchId },
-        data: { page_count: 0 },
+        data: { page_count: totalPageCount },
       });
       await updateBatchStatus(batchId, 'completed');
       return;
     }
 
-    // Set page_count early so previews work during processing
-    const totalPages = sections.reduce((sum, s) => sum + s.pages.length, 0);
+    // Set page_count to actual TIFF page count so previews work correctly
     const firstSection = sections[0]!;
     await prisma.batch.update({
       where: { id: batchId },
       data: {
         batch_type: firstSection.documentTypeCode,
-        page_count: totalPages,
+        page_count: totalPageCount,
       },
     });
 
@@ -163,7 +162,7 @@ export async function processTiffScan(batchId: number): Promise<void> {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     logger.info(
       `Batch ${batchId} completed: ${sections.length} sections, ` +
-      `${totalPages} total pages in ${elapsed}s`
+      `${totalPageCount} total pages in ${elapsed}s`
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

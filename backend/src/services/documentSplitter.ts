@@ -1,18 +1,15 @@
 import { getTiffPageCount, extractPageAsPng } from './tiffService';
-import {
-  detectBarcode,
-  normalizeBarcode,
-} from './barcodeService';
+import { detectBarcode, normalizeBarcode } from './barcodeService';
 import { logger } from '../utils/logger';
 
-export interface DocumentBoundary {
+export interface BatchSection {
   documentTypeCode: string;
-  startPage: number;
-  endPage: number;
+  pages: number[];
   barcodeRaw: string;
 }
 
 const UNCLASSIFIED_CODE = 'UNCLASSIFIED';
+const PAGE_CONCURRENCY = 4;
 
 async function scanPageForBarcode(
   filePath: string,
@@ -21,16 +18,6 @@ async function scanPageForBarcode(
   const pageBuffer = await extractPageAsPng(filePath, pageNumber);
   return detectBarcode(pageBuffer);
 }
-
-function finalizeDocument(
-  current: DocumentBoundary | null,
-  endPage: number
-): DocumentBoundary | null {
-  if (!current) return null;
-  return { ...current, endPage };
-}
-
-const PAGE_CONCURRENCY = 4;
 
 async function scanAllPages(
   filePath: string,
@@ -54,72 +41,84 @@ async function scanAllPages(
   return results;
 }
 
-function buildBoundaries(
-  pageResults: (string | null)[],
-  pageCount: number
-): DocumentBoundary[] {
-  const boundaries: DocumentBoundary[] = [];
-  let currentDocument: DocumentBoundary | null = null;
-
-  for (let page = 0; page < pageCount; page++) {
-    const rawBarcode = pageResults[page];
-
-    if (rawBarcode) {
-      const normalizedCode = normalizeBarcode(rawBarcode);
-      // Validation is deferred to caller — store raw result
-      currentDocument = handleBarcodePage(
-        page, rawBarcode, normalizedCode, currentDocument, boundaries
-      );
-    } else if (page === 0 && !currentDocument) {
-      currentDocument = {
-        documentTypeCode: UNCLASSIFIED_CODE,
-        startPage: 0,
-        endPage: 0,
-        barcodeRaw: '',
-      };
-      logger.info('  Page 0: no barcode found, starting as UNCLASSIFIED');
-    } else {
-      logger.info(`  Page ${page}: no barcode (continuation)`);
-    }
-  }
-
-  const finalDoc = finalizeDocument(currentDocument, pageCount - 1);
-  if (finalDoc) {
-    boundaries.push(finalDoc);
-    logger.info(`  Closed ${finalDoc.documentTypeCode} (pages ${finalDoc.startPage}-${finalDoc.endPage})`);
-  }
-
-  return boundaries;
+interface ActiveSection {
+  documentTypeCode: string;
+  pages: number[];
+  barcodeRaw: string;
 }
 
 function handleBarcodePage(
   page: number,
   rawBarcode: string,
   normalizedCode: string,
-  currentDocument: DocumentBoundary | null,
-  boundaries: DocumentBoundary[]
-): DocumentBoundary | null {
-  // Synchronous boundary check — validated codes are uppercase alpha
+  current: ActiveSection | null,
+  sections: BatchSection[]
+): ActiveSection | null {
   const isKnown = validatedDocTypes.has(normalizedCode);
   if (!isKnown) {
-    logger.info(`  Ignoring unrecognized barcode code: "${normalizedCode}"`);
-    logger.info(`  Page ${page}: barcode read "${normalizedCode}" but not a valid doc type`);
-    return currentDocument;
+    logger.info(`  Page ${page}: barcode "${normalizedCode}" not recognized, treating as continuation`);
+    // Still add page to current section - don't skip pages
+    if (current) {
+      current.pages.push(page);
+    }
+    return current;
   }
 
-  const finalized = finalizeDocument(currentDocument, page - 1);
-  if (finalized) {
-    boundaries.push(finalized);
-    logger.info(`  Closed ${finalized.documentTypeCode} (pages ${finalized.startPage}-${finalized.endPage})`);
+  if (current) {
+    sections.push({ ...current });
+    const range = current.pages;
+    logger.info(
+      `  Closed ${current.documentTypeCode} (pages ${range[0]}-${range[range.length - 1]})`
+    );
   }
 
   logger.info(`  Page ${page}: coversheet detected -> ${normalizedCode}`);
   return {
     documentTypeCode: normalizedCode,
-    startPage: page,
-    endPage: page,
+    pages: [page],
     barcodeRaw: rawBarcode,
   };
+}
+
+function buildBatchSections(
+  pageResults: (string | null)[],
+  pageCount: number
+): BatchSection[] {
+  const sections: BatchSection[] = [];
+  let current: ActiveSection | null = null;
+
+  for (let page = 0; page < pageCount; page++) {
+    const rawBarcode = pageResults[page];
+
+    if (rawBarcode) {
+      const normalizedCode = normalizeBarcode(rawBarcode);
+      current = handleBarcodePage(
+        page, rawBarcode, normalizedCode, current, sections
+      );
+    } else if (page === 0 && !current) {
+      current = {
+        documentTypeCode: UNCLASSIFIED_CODE,
+        pages: [0],
+        barcodeRaw: '',
+      };
+      logger.info('  Page 0: no barcode, starting as UNCLASSIFIED');
+    } else if (current) {
+      current.pages.push(page);
+      logger.info(`  Page ${page}: no barcode (continuation)`);
+    } else {
+      logger.info(`  Page ${page}: no barcode (continuation)`);
+    }
+  }
+
+  if (current) {
+    sections.push({ ...current });
+    const range = current.pages;
+    logger.info(
+      `  Closed ${current.documentTypeCode} (pages ${range[0]}-${range[range.length - 1]})`
+    );
+  }
+
+  return sections;
 }
 
 let validatedDocTypes: Set<string> = new Set();
@@ -139,9 +138,14 @@ async function loadDocumentTypes(): Promise<void> {
   }
 }
 
+export interface AnalyzeResult {
+  sections: BatchSection[];
+  totalPageCount: number;
+}
+
 export async function analyzeTiff(
   filePath: string
-): Promise<DocumentBoundary[]> {
+): Promise<AnalyzeResult> {
   const pageCount = await getTiffPageCount(filePath);
 
   if (pageCount === 0) {
@@ -150,14 +154,13 @@ export async function analyzeTiff(
 
   logger.info(`Analyzing TIFF with ${pageCount} pages: ${filePath}`);
 
-  // Load valid doc types once, then scan all pages in parallel
   await loadDocumentTypes();
   const pageResults = await scanAllPages(filePath, pageCount);
-  const boundaries = buildBoundaries(pageResults, pageCount);
+  const sections = buildBatchSections(pageResults, pageCount);
 
-  const summary = boundaries
-    .map((b) => `${b.documentTypeCode}[${b.startPage}-${b.endPage}]`)
+  const summary = sections
+    .map((s) => `${s.documentTypeCode}[${s.pages[0]}-${s.pages[s.pages.length - 1]}]`)
     .join(', ');
-  logger.info(`Split result: ${boundaries.length} documents -> ${summary}`);
-  return boundaries;
+  logger.info(`Split result: ${sections.length} sections -> ${summary}`);
+  return { sections, totalPageCount: pageCount };
 }
