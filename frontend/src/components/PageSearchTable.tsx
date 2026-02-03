@@ -20,7 +20,7 @@ interface PageSearchTableProps {
   results: PageSearchResult[];
   sorting: SortingState;
   onSortingChange: OnChangeFn<SortingState>;
-  onRowClick: (documentId: number, pageNumber: number) => void;
+  onRowClick: (batchId: number, pageNumber: number) => void;
 }
 
 const ALWAYS_VISIBLE: string[] = [];
@@ -101,6 +101,26 @@ export function PageSearchTable({
         cell: ({ row }) => (
           <span className="text-sm font-medium">
             p.{row.original.page_number}
+          </span>
+        ),
+      },
+      {
+        id: 'batch',
+        header: 'Batch',
+        accessorKey: 'batch_reference',
+        cell: ({ row }) => (
+          <span className="font-mono text-sm">
+            {row.original.batch_reference ?? '-'}
+          </span>
+        ),
+      },
+      {
+        id: 'batchType',
+        header: 'Batch Type',
+        accessorKey: 'batch_type',
+        cell: ({ row }) => (
+          <span className="text-sm">
+            {row.original.batch_type ?? '-'}
           </span>
         ),
       },
@@ -214,7 +234,7 @@ export function PageSearchTable({
             <tr
               key={row.id}
               className="hover:bg-gray-50 cursor-pointer"
-              onClick={() => onRowClick(row.original.document_id, row.original.page_number)}
+              onClick={() => onRowClick(row.original.root_batch_id, row.original.page_number)}
             >
               {row.getVisibleCells().map((cell) => (
                 <td

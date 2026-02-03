@@ -47,5 +47,9 @@ export interface PageSearchResult {
   document_type_code: string | null;
   document_type_name: string | null;
   store_number: string;
+  batch_id: number;
+  batch_reference: string | null;
+  batch_type: string | null;
+  root_batch_id: number;
   created_at: string;
 }

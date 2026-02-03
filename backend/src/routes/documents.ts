@@ -50,13 +50,22 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       },
       include: {
         batch: {
-          include: { store: true },
+          select: {
+            id: true,
+            reference: true,
+            batch_type: true,
+            parent_batch_id: true,
+            parentBatch: {
+              select: { id: true, reference: true, page_count: true },
+            },
+            store: true,
+          },
         },
         documentType: true,
         pageExtractions: {
           orderBy: { page_number: 'asc' },
           take: 1,
-          select: { fields: true },
+          select: { fields: true, confidence: true },
         },
       },
       orderBy: { created_at: 'desc' },
@@ -64,9 +73,13 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
     const serialized = documents.map((d) => {
       const raw = serializeDocument(d as unknown as Record<string, unknown>);
-      const extractions = raw['pageExtractions'] as { fields: unknown }[] | undefined;
+      const extractions = raw['pageExtractions'] as { fields: unknown; confidence: number }[] | undefined;
       raw['extraction_fields'] = extractions?.[0]?.fields ?? null;
+      raw['confidence'] = extractions?.[0]?.confidence ?? null;
       delete raw['pageExtractions'];
+      // Add root_batch_id for navigation to original batch with all pages
+      const batch = raw['batch'] as { id: number; parent_batch_id?: number | null; parentBatch?: { id: number } | null };
+      raw['root_batch_id'] = batch.parentBatch?.id ?? batch.id;
       return raw;
     });
     const response: ApiResponse = { success: true, data: serialized };
@@ -86,7 +99,15 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const document = await prisma.document.findUnique({
       where: { id },
       include: {
-        batch: { include: { store: true } },
+        batch: {
+          select: {
+            id: true,
+            reference: true,
+            batch_type: true,
+            file_name: true,
+            store: true,
+          },
+        },
         documentType: true,
       },
     });
@@ -124,7 +145,6 @@ router.get('/:id/extractions', async (req: Request, res: Response, next: NextFun
   }
 });
 
-// TODO: Add auth middleware - admin only
 router.patch(
   '/:id',
   async (req: Request, res: Response, next: NextFunction) => {

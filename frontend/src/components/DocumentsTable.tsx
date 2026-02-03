@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, useCallback } from 'react';
+import { useMemo } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -9,19 +9,17 @@ import {
   type OnChangeFn,
 } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { ChevronDown, ChevronRight } from 'lucide-react';
 import { docTypeIcons, type DocumentRow } from './docTypeIcons';
 import { useTableSettings } from '../hooks/useTableSettings';
 import { DOCUMENTS_TABLE_COLUMNS, DOCUMENTS_DEFAULT_ORDER, buildColumnOptions } from './tableColumnConfigs';
 import { ColumnSettingsDropdown } from './ColumnSettingsDropdown';
 import { ResizableHeader } from './ResizableHeader';
-import { DocumentExpandedRows } from './DocumentExpandedRows';
 
 interface DocumentsTableProps {
   documents: DocumentRow[];
   sorting: SortingState;
   onSortingChange: OnChangeFn<SortingState>;
-  onPageClick: (documentId: number, pageNumber: number) => void;
+  onDocumentClick: (batchId: number, pageNumber: number) => void;
 }
 
 const STATUS_STYLES: Record<string, { label: string; className: string }> = {
@@ -45,29 +43,23 @@ function docFieldCell(row: DocumentRow, key: string) {
     : <span className="text-gray-400">-</span>;
 }
 
+function confidenceCell(confidence: number | null) {
+  if (confidence === null) return <span className="text-gray-400">-</span>;
+  const pct = Math.round(confidence * 100);
+  const color = confidence >= 0.7
+    ? 'text-green-600'
+    : confidence >= 0.4
+      ? 'text-yellow-600'
+      : 'text-red-600';
+  return <span className={`font-medium ${color}`}>{pct}%</span>;
+}
+
 export function DocumentsTable({
   documents,
   sorting,
   onSortingChange,
-  onPageClick,
+  onDocumentClick,
 }: DocumentsTableProps) {
-  const [expandedIds, setExpandedIds] = useState<Set<number>>(() => {
-    try {
-      const raw = sessionStorage.getItem('documentsExpandedIds');
-      return raw ? new Set(JSON.parse(raw) as number[]) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
-
-  const toggleExpanded = useCallback((id: number) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      sessionStorage.setItem('documentsExpandedIds', JSON.stringify([...next]));
-      return next;
-    });
-  }, []);
   const {
     columnVisibility,
     onColumnVisibilityChange,
@@ -95,11 +87,8 @@ export function DocumentsTable({
           const code = row.original.documentType?.code ?? 'UNCLASSIFIED';
           const config = docTypeIcons[code] ?? docTypeIcons['UNCLASSIFIED']!;
           const Icon = config!.icon;
-          const isExpanded = expandedIds.has(row.original.id);
-          const Chevron = isExpanded ? ChevronDown : ChevronRight;
           return (
             <div className="flex items-center gap-2">
-              <Chevron size={16} className="text-gray-400 flex-shrink-0" />
               <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center ${config!.color}`}>
                 <Icon size={16} />
               </div>
@@ -128,10 +117,38 @@ export function DocumentsTable({
         cell: ({ row }) => row.original.batch.store.store_number,
       },
       {
-        id: 'pages',
-        header: 'Pages',
-        accessorFn: (row) => row.page_end - row.page_start + 1,
-        cell: ({ row }) => row.original.page_end - row.original.page_start + 1,
+        id: 'pageNumber',
+        header: 'Page',
+        accessorKey: 'page_number',
+        cell: ({ row }) => (
+          <span className="text-sm font-medium">p.{row.original.page_number}</span>
+        ),
+      },
+      {
+        id: 'batch',
+        header: 'Batch',
+        accessorKey: 'batch.reference',
+        cell: ({ row }) => (
+          <span className="font-mono text-sm">
+            {row.original.batch.reference ?? '-'}
+          </span>
+        ),
+      },
+      {
+        id: 'batchType',
+        header: 'Batch Type',
+        accessorKey: 'batch.batch_type',
+        cell: ({ row }) => (
+          <span className="text-sm">
+            {row.original.batch.batch_type ?? '-'}
+          </span>
+        ),
+      },
+      {
+        id: 'confidence',
+        header: 'Confidence',
+        accessorKey: 'confidence',
+        cell: ({ row }) => confidenceCell(row.original.confidence),
       },
       {
         id: 'reference',
@@ -186,7 +203,7 @@ export function DocumentsTable({
           format(new Date(row.original.created_at), 'MMM d, yyyy'),
       },
     ],
-    [expandedIds]
+    []
   );
 
   const table = useReactTable({
@@ -229,34 +246,23 @@ export function DocumentsTable({
           ))}
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {table.getRowModel().rows.map((row) => {
-            const isExpanded = expandedIds.has(row.original.id);
-            return (
-              <Fragment key={row.id}>
-                <tr
-                  className={`hover:bg-gray-50 cursor-pointer ${isExpanded ? 'bg-blue-50/50' : ''}`}
-                  onClick={() => toggleExpanded(row.original.id)}
+          {table.getRowModel().rows.map((row) => (
+            <tr
+              key={row.id}
+              className="hover:bg-gray-50 cursor-pointer"
+              onClick={() => onDocumentClick(row.original.root_batch_id, row.original.page_number)}
+            >
+              {row.getVisibleCells().map((cell) => (
+                <td
+                  key={cell.id}
+                  className="px-4 py-3"
+                  style={{ width: cell.column.getSize() }}
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      className="px-4 py-3"
-                      style={{ width: cell.column.getSize() }}
-                    >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
-                {isExpanded && (
-                  <DocumentExpandedRows
-                    documentId={row.original.id}
-                    colSpan={row.getVisibleCells().length}
-                    onPageClick={onPageClick}
-                  />
-                )}
-              </Fragment>
-            );
-          })}
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </td>
+              ))}
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>

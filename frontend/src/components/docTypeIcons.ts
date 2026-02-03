@@ -31,10 +31,14 @@ export interface DocumentRow {
   id: number;
   reference: string | null;
   status: string;
-  page_start: number;
-  page_end: number;
+  page_number: number;
   created_at: string;
+  confidence: number | null;
+  root_batch_id: number;
   batch: {
+    id: number;
+    reference: string | null;
+    batch_type: string | null;
     store: { store_number: string };
   };
   documentType: { name: string; code: string } | null;
