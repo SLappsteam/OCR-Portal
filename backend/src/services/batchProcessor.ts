@@ -79,7 +79,7 @@ async function processSectionPages(
     const isCoversheet = i === 0 && section.documentTypeCode !== 'UNCLASSIFIED';
 
     const docId = await createPageDocument(
-      batchId, storeNumber, page, section.documentTypeCode
+      batchId, storeNumber, page, section.documentTypeCode, isCoversheet
     );
 
     await extractAndStorePage(

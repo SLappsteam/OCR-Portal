@@ -30,6 +30,7 @@ export function Documents() {
     startDate: '',
     endDate: '',
     search: '',
+    excludeCoversheets: true,
   });
   const [searchInput, setSearchInput] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
@@ -65,8 +66,11 @@ export function Documents() {
         .catch(console.error)
         .finally(() => setIsLoading(false));
     } else {
-      const hasFilters = filters.storeNumber || filters.documentType;
-      fetchDocuments(hasFilters ? filters : undefined)
+      fetchDocuments({
+        storeNumber: filters.storeNumber || undefined,
+        documentType: filters.documentType || undefined,
+        excludeCoversheets: filters.excludeCoversheets,
+      })
         .then((data) => setDocuments(data as DocumentRow[]))
         .catch(console.error)
         .finally(() => setIsLoading(false));
@@ -92,23 +96,36 @@ export function Documents() {
         </p>
       </div>
 
-      <SearchFilterBar
-        searchInput={searchInput}
-        onSearchChange={handleSearchChange}
-        storeNumber={filters.storeNumber}
-        onStoreChange={(v) => setFilters((f) => ({ ...f, storeNumber: v }))}
-        stores={stores}
-        documentType={filters.documentType}
-        onDocumentTypeChange={(v) => setFilters((f) => ({ ...f, documentType: v }))}
-        docTypes={docTypes}
-        isSearchMode={isSearchMode}
-        startDate={filters.startDate}
-        onStartDateChange={(v) => setFilters((f) => ({ ...f, startDate: v }))}
-        endDate={filters.endDate}
-        onEndDateChange={(v) => setFilters((f) => ({ ...f, endDate: v }))}
-        fieldFilters={fieldFilters}
-        onFieldFiltersChange={setFieldFilters}
-      />
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <SearchFilterBar
+          searchInput={searchInput}
+          onSearchChange={handleSearchChange}
+          storeNumber={filters.storeNumber}
+          onStoreChange={(v) => setFilters((f) => ({ ...f, storeNumber: v }))}
+          stores={stores}
+          documentType={filters.documentType}
+          onDocumentTypeChange={(v) => setFilters((f) => ({ ...f, documentType: v }))}
+          docTypes={docTypes}
+          isSearchMode={isSearchMode}
+          startDate={filters.startDate}
+          onStartDateChange={(v) => setFilters((f) => ({ ...f, startDate: v }))}
+          endDate={filters.endDate}
+          onEndDateChange={(v) => setFilters((f) => ({ ...f, endDate: v }))}
+          fieldFilters={fieldFilters}
+          onFieldFiltersChange={setFieldFilters}
+        />
+        {!isSearchMode && (
+          <label className="flex items-center gap-2 text-sm text-gray-600 whitespace-nowrap">
+            <input
+              type="checkbox"
+              checked={filters.excludeCoversheets}
+              onChange={(e) => setFilters((f) => ({ ...f, excludeCoversheets: e.target.checked }))}
+              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            />
+            Exclude Coversheets
+          </label>
+        )}
+      </div>
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
         {isLoading ? (

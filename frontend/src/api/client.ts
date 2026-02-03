@@ -107,12 +107,14 @@ export async function fetchDocuments(params?: {
   documentType?: string;
   startDate?: string;
   endDate?: string;
+  excludeCoversheets?: boolean;
 }) {
   const searchParams = new URLSearchParams();
   if (params?.storeNumber) searchParams.set('storeNumber', params.storeNumber);
   if (params?.documentType) searchParams.set('documentType', params.documentType);
   if (params?.startDate) searchParams.set('startDate', params.startDate);
   if (params?.endDate) searchParams.set('endDate', params.endDate);
+  if (params?.excludeCoversheets) searchParams.set('excludeCoversheets', 'true');
 
   const query = searchParams.toString();
   const endpoint = `/api/documents${query ? `?${query}` : ''}`;
@@ -256,4 +258,8 @@ export function getPreviewUrl(documentId: number, page: number): string {
 
 export function getThumbnailUrl(documentId: number): string {
   return `${API_BASE_URL}/api/preview/${documentId}/thumbnail`;
+}
+
+export function getBatchPreviewUrl(batchId: number, pageNumber: number): string {
+  return `${API_BASE_URL}/api/preview/batch/${batchId}/${pageNumber}`;
 }

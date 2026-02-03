@@ -21,6 +21,7 @@ const querySchema = z.object({
   documentType: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
+  excludeCoversheets: z.string().optional(),
 });
 
 const updateSchema = z.object({
@@ -35,7 +36,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       throw new BadRequestError('Invalid query parameters');
     }
 
-    const { storeNumber, documentType, startDate, endDate } = parsed.data;
+    const { storeNumber, documentType, startDate, endDate, excludeCoversheets } = parsed.data;
 
     const documents = await prisma.document.findMany({
       where: {
@@ -43,6 +44,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
           ? { store: { store_number: storeNumber } }
           : undefined,
         documentType: documentType ? { code: documentType } : undefined,
+        is_coversheet: excludeCoversheets === 'true' ? false : undefined,
         created_at: {
           gte: startDate ? new Date(startDate) : undefined,
           lte: endDate ? new Date(endDate) : undefined,
