@@ -18,6 +18,8 @@ interface SearchFilterBarProps {
   onEndDateChange: (value: string) => void;
   fieldFilters: FieldFilter[];
   onFieldFiltersChange: (filters: FieldFilter[]) => void;
+  excludeCoversheets?: boolean;
+  onExcludeCoversheetChange?: (value: boolean) => void;
 }
 
 export function SearchFilterBar({
@@ -36,6 +38,8 @@ export function SearchFilterBar({
   onEndDateChange,
   fieldFilters,
   onFieldFiltersChange,
+  excludeCoversheets,
+  onExcludeCoversheetChange,
 }: SearchFilterBarProps) {
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
@@ -91,6 +95,17 @@ export function SearchFilterBar({
               onChange={(e) => onEndDateChange(e.target.value)}
               className="border border-gray-200 rounded px-3 py-2 text-sm"
             />
+            {onExcludeCoversheetChange && (
+              <label className="flex items-center gap-2 text-sm text-gray-600 whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={excludeCoversheets ?? true}
+                  onChange={(e) => onExcludeCoversheetChange(e.target.checked)}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                Exclude Coversheets
+              </label>
+            )}
           </>
         )}
       </div>

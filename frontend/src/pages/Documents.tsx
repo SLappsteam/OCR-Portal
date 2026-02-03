@@ -96,36 +96,25 @@ export function Documents() {
         </p>
       </div>
 
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <SearchFilterBar
-          searchInput={searchInput}
-          onSearchChange={handleSearchChange}
-          storeNumber={filters.storeNumber}
-          onStoreChange={(v) => setFilters((f) => ({ ...f, storeNumber: v }))}
-          stores={stores}
-          documentType={filters.documentType}
-          onDocumentTypeChange={(v) => setFilters((f) => ({ ...f, documentType: v }))}
-          docTypes={docTypes}
-          isSearchMode={isSearchMode}
-          startDate={filters.startDate}
-          onStartDateChange={(v) => setFilters((f) => ({ ...f, startDate: v }))}
-          endDate={filters.endDate}
-          onEndDateChange={(v) => setFilters((f) => ({ ...f, endDate: v }))}
-          fieldFilters={fieldFilters}
-          onFieldFiltersChange={setFieldFilters}
-        />
-        {!isSearchMode && (
-          <label className="flex items-center gap-2 text-sm text-gray-600 whitespace-nowrap">
-            <input
-              type="checkbox"
-              checked={filters.excludeCoversheets}
-              onChange={(e) => setFilters((f) => ({ ...f, excludeCoversheets: e.target.checked }))}
-              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-            />
-            Exclude Coversheets
-          </label>
-        )}
-      </div>
+      <SearchFilterBar
+        searchInput={searchInput}
+        onSearchChange={handleSearchChange}
+        storeNumber={filters.storeNumber}
+        onStoreChange={(v) => setFilters((f) => ({ ...f, storeNumber: v }))}
+        stores={stores}
+        documentType={filters.documentType}
+        onDocumentTypeChange={(v) => setFilters((f) => ({ ...f, documentType: v }))}
+        docTypes={docTypes}
+        isSearchMode={isSearchMode}
+        startDate={filters.startDate}
+        onStartDateChange={(v) => setFilters((f) => ({ ...f, startDate: v }))}
+        endDate={filters.endDate}
+        onEndDateChange={(v) => setFilters((f) => ({ ...f, endDate: v }))}
+        fieldFilters={fieldFilters}
+        onFieldFiltersChange={setFieldFilters}
+        excludeCoversheets={filters.excludeCoversheets}
+        onExcludeCoversheetChange={(v) => setFilters((f) => ({ ...f, excludeCoversheets: v }))}
+      />
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
         {isLoading ? (
