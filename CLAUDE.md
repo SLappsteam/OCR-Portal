@@ -8,9 +8,9 @@ Boolean prefixes (is, has, can)
 Functions are verbs
 Constants in SCREAMING_SNAKE
 Database in snake_case
-Rotating Logs (Your Requirement)
-10MB max per file
-5 files retained
+Rotating Logs
+ - 10MB max per file
+ - 5 files retained
 No sensitive data logged
 Clean Git Workflow
 Branch naming with ticket numbers
