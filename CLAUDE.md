@@ -12,6 +12,7 @@
  - 10MB max per file
  - 5 files retained
  - No sensitive data logged
+   
  - Clean Git Workflow
  - Branch naming with ticket numbers
  - Conventional commits
