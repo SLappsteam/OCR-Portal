@@ -32,8 +32,10 @@ function isFinsalesContent(text: string): boolean {
 }
 
 function detectDocumentType(text: string): 'FINTRAN' | 'FINSALES' | null {
-  if (isFintranContent(text)) return 'FINTRAN';
+  // Check FINSALES first - it has more specific header patterns
+  // FINSALES tickets may mention "FINANCED AMOUNT" but are still sales tickets
   if (isFinsalesContent(text)) return 'FINSALES';
+  if (isFintranContent(text)) return 'FINTRAN';
   return null;
 }
 
@@ -45,15 +47,7 @@ export async function classifyPageContent(
   const parsed = await ocrAndParse(filePath, page);
 
   if (parsed) {
-    // Only update document type if it was UNCLASSIFIED
-    // Barcode-determined type from batch section takes precedence
-    const doc = await prisma.document.findUnique({
-      where: { id: docId },
-      include: { documentType: true },
-    });
-    if (doc?.documentType?.code === 'UNCLASSIFIED') {
-      await setDocumentType(docId, parsed.documentType);
-    }
+    await setDocumentType(docId, parsed.documentType);
     await storePageExtraction(docId, parsed, page);
   }
 }
