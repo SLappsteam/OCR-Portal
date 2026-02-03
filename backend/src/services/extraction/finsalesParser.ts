@@ -9,6 +9,7 @@ export function parseFinsalesPage(rawText: string): FinsalesData {
 
   const base: FinsalesData = {
     fulfillment: header.fulfillment ?? null,
+    order_type: header.order_type ?? null,
     order_id: header.order_id ?? null,
     customer_name: header.customer_name ?? null,
     customer_id: null,

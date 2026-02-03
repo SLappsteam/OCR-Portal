@@ -22,6 +22,7 @@ export function parseTransactionReceipt(rawText: string): FinsalesData {
 
   return {
     fulfillment: 'RECEIPT',
+    order_type: null,
     order_id: extractField(rawText, SALES_ORDER_PATTERN),
     customer_name: name,
     customer_id: extractField(rawText, CUSTOMER_ID_PATTERN),

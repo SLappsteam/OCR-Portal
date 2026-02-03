@@ -1,5 +1,6 @@
 export interface FinsalesData {
   fulfillment: string | null;
+  order_type: string | null;
   order_id: string | null;
   customer_name: string | null;
   customer_id: string | null;
