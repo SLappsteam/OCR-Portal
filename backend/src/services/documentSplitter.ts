@@ -54,7 +54,7 @@ function handleBarcodePage(
   current: ActiveSection | null,
   sections: BatchSection[]
 ): ActiveSection | null {
-  const isKnown = validatedDocTypes.has(normalizedCode);
+  const isKnown = validBatchTypes.has(normalizedCode);
   if (!isKnown) {
     logger.info(`  Page ${page}: barcode "${normalizedCode}" not recognized, treating as continuation`);
     // Still add page to current section - don't skip pages
@@ -121,22 +121,23 @@ function buildBatchSections(
   return sections;
 }
 
-let validatedDocTypes: Set<string> = new Set();
+// Valid batch type codes that can appear on coversheet barcodes
+// These are batch types, not document types (which are INVOICE, MANIFEST, UNKNOWN)
+const VALID_BATCH_TYPES = new Set([
+  'CDR',
+  'APINV',
+  'ATOMRCV',
+  'MTOZRCV',
+  'LBRCV',
+  'REFUND',
+  'EXPENSE',
+  'FINSALES',
+  'FINTRAN',
+  'LOFTFIN',
+  'WFDEP',
+]);
 
-async function loadDocumentTypes(): Promise<void> {
-  const { PrismaClient } = await import('@prisma/client');
-  const prisma = new PrismaClient();
-  try {
-    const types = await prisma.documentType.findMany({
-      where: { is_active: true },
-      select: { code: true },
-    });
-    validatedDocTypes = new Set(types.map((t) => t.code));
-    logger.info(`Loaded ${validatedDocTypes.size} active document types`);
-  } finally {
-    await prisma.$disconnect();
-  }
-}
+let validBatchTypes: Set<string> = VALID_BATCH_TYPES;
 
 export interface AnalyzeResult {
   sections: BatchSection[];
@@ -154,7 +155,6 @@ export async function analyzeTiff(
 
   logger.info(`Analyzing TIFF with ${pageCount} pages: ${filePath}`);
 
-  await loadDocumentTypes();
   const pageResults = await scanAllPages(filePath, pageCount);
   const sections = buildBatchSections(pageResults, pageCount);
 
