@@ -1,7 +1,8 @@
 import { FinsalesData } from './types';
 import { uppercaseFields } from './headerParser';
 
-const TICKET_PATTERN = /(D\s*E\s*L\s*I\s*V\s*E\s*R\s*Y|R\s*E\s*T\s*U\s*R\s*N)\s+TIC\w*ET/i;
+// Final T optional: OCR may garble "TICKET" to "TICKE" when handwriting overlaps
+const TICKET_PATTERN = /(D\s*E\s*L\s*I\s*V\s*E\s*R\s*Y|R\s*E\s*T\s*U\s*R\s*N)\s+TIC\w*ET?/i;
 const ORDER_ID_PATTERN = /(?:Order|Return)\s+(?:ID|1D|0)[;:]\s*(.+?)(?:\s*\(|$)/im;
 const CUSTOMER_ID_PATTERN = /Customer\s+ID[;:]\s*(\S+)/i;
 const DELIVERY_DATE_PATTERN = /Delivery\s+Date:\s*([\d/]+)/i;
