@@ -250,7 +250,15 @@ export function DocumentsTable({
             <tr
               key={row.id}
               className="hover:bg-gray-50 cursor-pointer"
+              role="button"
+              tabIndex={0}
               onClick={() => onDocumentClick(row.original.batch.id, row.original.page_number)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onDocumentClick(row.original.batch.id, row.original.page_number);
+                }
+              }}
             >
               {row.getVisibleCells().map((cell) => (
                 <td

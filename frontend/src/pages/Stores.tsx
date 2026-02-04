@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { Plus, Store as StoreIcon } from 'lucide-react';
+import { toast } from 'react-toastify';
 import { fetchStores, apiClient } from '../api/client';
 import type { ApiResponse } from '../types';
 
@@ -27,7 +28,7 @@ export function Stores() {
     setIsLoading(true);
     fetchStores()
       .then((data) => setStores(data as StoreData[]))
-      .catch(console.error)
+      .catch(() => toast.error('Failed to load stores'))
       .finally(() => setIsLoading(false));
   };
 
@@ -151,10 +152,11 @@ export function Stores() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="store-number" className="block text-sm font-medium text-gray-700 mb-1">
                   Store Number
                 </label>
                 <input
+                  id="store-number"
                   type="text"
                   value={newStore.storeNumber}
                   onChange={(e) =>
@@ -166,10 +168,11 @@ export function Stores() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="store-name" className="block text-sm font-medium text-gray-700 mb-1">
                   Store Name
                 </label>
                 <input
+                  id="store-name"
                   type="text"
                   value={newStore.name}
                   onChange={(e) =>

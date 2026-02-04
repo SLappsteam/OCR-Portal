@@ -107,8 +107,9 @@ export function OidcSettingsSection() {
           </div>
 
           <div className="flex items-center gap-3">
-            <label className="relative inline-flex items-center cursor-pointer">
+            <label htmlFor="oidc-enabled" className="relative inline-flex items-center cursor-pointer">
               <input
+                id="oidc-enabled"
                 type="checkbox"
                 checked={enabled}
                 onChange={(e) => setEnabled(e.target.checked)}
@@ -123,10 +124,11 @@ export function OidcSettingsSection() {
 
           <div className="grid gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label htmlFor="oidc-tenant-id" className="block text-sm font-medium text-gray-700">
                 Tenant ID
               </label>
               <input
+                id="oidc-tenant-id"
                 type="text"
                 value={tenantId}
                 onChange={(e) => setTenantId(e.target.value)}
@@ -135,10 +137,11 @@ export function OidcSettingsSection() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label htmlFor="oidc-client-id" className="block text-sm font-medium text-gray-700">
                 Client ID
               </label>
               <input
+                id="oidc-client-id"
                 type="text"
                 value={clientId}
                 onChange={(e) => setClientId(e.target.value)}
@@ -150,7 +153,7 @@ export function OidcSettingsSection() {
 
           <div>
             <div className="flex items-center gap-2">
-              <label className="block text-sm font-medium text-gray-700">
+              <label htmlFor="oidc-client-secret" className="block text-sm font-medium text-gray-700">
                 Client Secret
               </label>
               <span
@@ -164,6 +167,7 @@ export function OidcSettingsSection() {
               </span>
             </div>
             <input
+              id="oidc-client-secret"
               type="password"
               value={clientSecret}
               onChange={(e) => setClientSecret(e.target.value)}

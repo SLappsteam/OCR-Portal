@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { type SortingState } from '@tanstack/react-table';
+import { toast } from 'react-toastify';
 import {
   fetchDocuments,
   fetchStores,
@@ -49,7 +50,7 @@ export function Documents() {
         setStores(storesData as { store_number: string }[]);
         setDocTypes(typesData as { code: string; name: string }[]);
       })
-      .catch(console.error);
+      .catch(() => toast.error('Failed to load filter options'));
   }, []);
 
   useEffect(() => {
@@ -63,7 +64,7 @@ export function Documents() {
         filters: fieldFilters.length > 0 ? fieldFilters : undefined,
       })
         .then(setPageResults)
-        .catch(console.error)
+        .catch(() => toast.error('Failed to search pages'))
         .finally(() => setIsLoading(false));
     } else {
       fetchDocuments({
@@ -72,7 +73,7 @@ export function Documents() {
         excludeCoversheets: filters.excludeCoversheets,
       })
         .then((data) => setDocuments(data as DocumentRow[]))
-        .catch(console.error)
+        .catch(() => toast.error('Failed to load documents'))
         .finally(() => setIsLoading(false));
     }
   }, [filters, fieldFilters]);

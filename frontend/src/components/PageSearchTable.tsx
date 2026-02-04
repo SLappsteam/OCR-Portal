@@ -234,7 +234,15 @@ export function PageSearchTable({
             <tr
               key={row.id}
               className="hover:bg-gray-50 cursor-pointer"
+              role="button"
+              tabIndex={0}
               onClick={() => onRowClick(row.original.batch_id, row.original.page_number)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onRowClick(row.original.batch_id, row.original.page_number);
+                }
+              }}
             >
               {row.getVisibleCells().map((cell) => (
                 <td

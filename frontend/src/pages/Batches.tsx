@@ -18,6 +18,7 @@ import {
   FileText,
   AlertTriangle,
 } from 'lucide-react';
+import { toast } from 'react-toastify';
 import { fetchBatches, fetchStores, reprocessBatch } from '../api/client';
 import { BatchDetailsPanel } from '../components/BatchDetailsPanel';
 
@@ -75,7 +76,7 @@ export function Batches() {
   const loadStores = () => {
     fetchStores()
       .then((data) => setStores(data as StoreData[]))
-      .catch(console.error);
+      .catch(() => toast.error('Failed to load stores'));
   };
 
   useEffect(() => {
@@ -86,7 +87,7 @@ export function Batches() {
     setIsLoading(true);
     fetchBatches(filters.storeNumber || filters.status ? filters : undefined)
       .then((data) => setBatches(data as BatchRow[]))
-      .catch(console.error)
+      .catch(() => toast.error('Failed to load batches'))
       .finally(() => setIsLoading(false));
   };
 
@@ -100,7 +101,7 @@ export function Batches() {
       await reprocessBatch(batchId);
       loadBatches();
     } catch (err) {
-      console.error('Reprocess failed:', err);
+      toast.error('Failed to reprocess batch');
     } finally {
       setReprocessing(null);
     }
@@ -121,6 +122,7 @@ export function Batches() {
               }));
             }}
             className="p-1"
+            aria-label={expanded[row.id] ? 'Collapse batch details' : 'Expand batch details'}
           >
             <ChevronRight
               size={16}
@@ -280,6 +282,7 @@ export function Batches() {
           <button
             onClick={loadBatches}
             className="px-3 py-2 border border-gray-200 rounded hover:bg-gray-50"
+            aria-label="Refresh batches"
           >
             <RefreshCw size={16} className="text-gray-600" />
           </button>

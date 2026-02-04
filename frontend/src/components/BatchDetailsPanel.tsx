@@ -93,7 +93,15 @@ export function BatchDetailsPanel({ batchId }: Props) {
                 {details.childBatches.map((child) => (
                   <tr
                     key={child.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => navigate(`/batches/${child.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        navigate(`/batches/${child.id}`);
+                      }
+                    }}
                     className="hover:bg-gray-50 cursor-pointer opacity-60"
                   >
                     <td className="px-3 py-2 font-mono">
@@ -141,7 +149,15 @@ export function BatchDetailsPanel({ batchId }: Props) {
               return (
                 <tr
                   key={i}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => navigate(`/batches/${batchId}?page=${i}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      navigate(`/batches/${batchId}?page=${i}`);
+                    }
+                  }}
                   className={`hover:bg-gray-50 cursor-pointer ${
                     !hasDoc ? 'bg-amber-50' : ''
                   }`}

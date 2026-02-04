@@ -206,7 +206,15 @@ function PageThumbnails({
             <div
               key={i}
               ref={isSelected ? selectedRef : null}
+              role="button"
+              tabIndex={0}
               onClick={() => onPageSelect(i)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onPageSelect(i);
+                }
+              }}
               className={`cursor-pointer rounded border-2 transition-all ${
                 isSelected
                   ? 'border-primary-500 ring-2 ring-primary-200'
@@ -275,6 +283,7 @@ function Toolbar({
         onClick={onZoomOut}
         className="p-1.5 hover:bg-gray-200 rounded"
         title="Zoom out"
+        aria-label="Zoom out"
       >
         <ZoomOut size={18} />
       </button>
@@ -283,6 +292,7 @@ function Toolbar({
         onClick={onZoomIn}
         className="p-1.5 hover:bg-gray-200 rounded"
         title="Zoom in"
+        aria-label="Zoom in"
       >
         <ZoomIn size={18} />
       </button>
@@ -293,6 +303,7 @@ function Toolbar({
         onClick={onRotateLeft}
         className="p-1.5 hover:bg-gray-200 rounded"
         title="Rotate left"
+        aria-label="Rotate left"
       >
         <RotateCcw size={18} />
       </button>
@@ -300,6 +311,7 @@ function Toolbar({
         onClick={onRotateRight}
         className="p-1.5 hover:bg-gray-200 rounded"
         title="Rotate right"
+        aria-label="Rotate right"
       >
         <RotateCw size={18} />
       </button>
@@ -310,6 +322,7 @@ function Toolbar({
         onClick={onReset}
         className="p-1.5 hover:bg-gray-200 rounded"
         title="Reset view"
+        aria-label="Reset view"
       >
         <RotateCcw size={18} className="text-gray-500" />
       </button>

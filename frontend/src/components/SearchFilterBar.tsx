@@ -51,6 +51,7 @@ export function SearchFilterBar({
             value={searchInput}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search customer, order, phone..."
+            aria-label="Search documents"
             className="border border-gray-200 rounded pl-9 pr-3 py-2 text-sm w-64"
           />
         </div>
@@ -87,12 +88,14 @@ export function SearchFilterBar({
               type="date"
               value={startDate}
               onChange={(e) => onStartDateChange(e.target.value)}
+              aria-label="Start date"
               className="border border-gray-200 rounded px-3 py-2 text-sm"
             />
             <input
               type="date"
               value={endDate}
               onChange={(e) => onEndDateChange(e.target.value)}
+              aria-label="End date"
               className="border border-gray-200 rounded px-3 py-2 text-sm"
             />
             {onExcludeCoversheetChange && (

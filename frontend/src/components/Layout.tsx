@@ -90,6 +90,7 @@ export function Layout({ children }: LayoutProps) {
               onClick={logout}
               className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
               title="Sign out"
+              aria-label="Sign out"
             >
               <LogOut size={14} />
             </button>
