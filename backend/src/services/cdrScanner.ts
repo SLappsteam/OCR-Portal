@@ -19,6 +19,8 @@ const prisma = new PrismaClient();
 
 const FINSALES_HEADER = /TYPE\s*:.*STAT\s*[.:]/i;
 const CREDIT_HEADER = /CREDIT\s*:\s*\d/i;
+// Fallback: OCR may garble "ORDER TYPE:" but "STAT:" usually survives
+const STAT_FALLBACK = /\bSTAT\s*[.:]\s*[A-Z]\b/i;
 const FINTRAN_PATTERNS = [
   /FINANCE\s+COMPANY/i,
   /MONTHLY\s+PAYMENT/i,
@@ -34,7 +36,7 @@ function isFintranContent(text: string): boolean {
 }
 
 function isFinsalesContent(text: string): boolean {
-  return FINSALES_HEADER.test(text) || isTicketPage(text) || CREDIT_HEADER.test(text);
+  return FINSALES_HEADER.test(text) || isTicketPage(text) || CREDIT_HEADER.test(text) || STAT_FALLBACK.test(text);
 }
 
 function isInvoiceContent(text: string): boolean {

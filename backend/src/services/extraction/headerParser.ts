@@ -9,6 +9,14 @@ const DIRECTIONAL_SUFFIX = '(?:\\s+(?:N|S|E|W|NE|NW|SE|SW)\\.?)?';
 
 const HEADER_LINE_PATTERN = /TYPE\s*:.*STAT\s*[.:]/i;
 const CREDIT_LINE_PATTERN = /CREDIT\s*:\s*\d/i;
+// Fallback when OCR garbles "TYPE:" but "STAT:" survives (e.g., circled text)
+const STAT_LINE_PATTERN = /\bSTAT\s*[.:]\s*[A-Z]/i;
+
+function findHeaderLineIndex(lines: string[]): number {
+  const idx = lines.findIndex((l) => HEADER_LINE_PATTERN.test(l));
+  if (idx >= 0) return idx;
+  return lines.findIndex((l) => STAT_LINE_PATTERN.test(l));
+}
 
 export function extractHeader(rawText: string): Partial<FinsalesData> {
   const { address, fulfillmentType } = extractAddressAndFulfillment(rawText);
@@ -53,10 +61,10 @@ function extractOrderId(text: string): string | null {
 }
 
 function extractCustomerName(text: string): string | null {
-  // Primary: name between store address suffix (with optional directional) and "ORDER TYPE:"
-  // Examples: "Ave. NE Steve Hazuka ORDER TYPE:", "St. Steve Jones ORDER TYPE:"
+  // Primary: name between store address suffix (with optional directional) and "ORDER"
+  // Handles both "ORDER TYPE: SAL" and garbled "ORDER SAL" (when TYPE: is lost to OCR)
   const primary = new RegExp(
-    `\\b${STREET_SUFFIX}${DIRECTIONAL_SUFFIX}\\s+([A-Z][A-Za-z /.'()-]+?)\\s+(?:NA\\s+)?ORDER\\s+TYPE`, 'i'
+    `\\b${STREET_SUFFIX}${DIRECTIONAL_SUFFIX}\\s+([A-Z][A-Za-z /.'()-]+?)\\s+(?:NA\\s+)?ORDER\\b`, 'i'
   );
   const match = text.match(primary);
   if (match?.[1]) return match[1].trim();
@@ -68,14 +76,14 @@ function extractCustomerName(text: string): string | null {
   const creditMatch = text.match(creditPrimary);
   if (creditMatch?.[1]) return creditMatch[1].trim();
 
-  // Fallback: find header line via TYPE:...STAT: or CREDIT:, extract name
+  // Fallback: find header line, extract name before ORDER/TYPE/CREDIT/STAT
   const lines = text.split('\n');
-  let idx = lines.findIndex((l) => HEADER_LINE_PATTERN.test(l));
+  let idx = findHeaderLineIndex(lines);
   if (idx < 0) {
     idx = lines.findIndex((l) => CREDIT_LINE_PATTERN.test(l));
   }
   if (idx >= 0) {
-    const before = (lines[idx] ?? '').split(/(?:TYPE|CREDIT)\s*:/i)[0] ?? '';
+    const before = (lines[idx] ?? '').split(/\b(?:ORDER|TYPE|CREDIT)\b/i)[0] ?? '';
     // Strip street suffix and optional directional (e.g., "Ave. NE")
     const afterStreet = before.replace(
       new RegExp(`^.*\\b${STREET_SUFFIX}${DIRECTIONAL_SUFFIX}\\s+`, 'i'), ''
@@ -142,7 +150,7 @@ function extractAddressAndFulfillment(
   text: string
 ): { address: string | null; fulfillmentType: string | null } {
   const lines = text.split('\n');
-  const idx = lines.findIndex((l) => HEADER_LINE_PATTERN.test(l));
+  const idx = findHeaderLineIndex(lines);
   if (idx < 0) return { address: null, fulfillmentType: null };
 
   const nextLine = lines[idx + 1];
@@ -168,7 +176,12 @@ function extractCityStateZip(text: string): string | null {
   const match = text.match(
     /([A-Z][A-Za-z\s]+,\s*[A-Z0-9|]{2}\s+\d{5}(?:-\d{4})?)\s+DATE:/i
   );
-  return match?.[1]?.trim() ?? null;
+  if (match?.[1]) return match[1].trim();
+  // Fallback: OCR may garble "DATE:" to "TE:" when partially obscured
+  const fallback = text.match(
+    /([A-Z][A-Za-z\s]+,\s*[A-Z0-9|]{2}\s+\d{5}(?:-\d{4})?)\s+\bA?TE:/i
+  );
+  return fallback?.[1]?.trim() ?? null;
 }
 
 function extractPhone(text: string): string | null {
@@ -191,12 +204,18 @@ function extractPhone(text: string): string | null {
 
 function extractDate(text: string): string | null {
   const match = text.match(/DATE:\s*([\d/]+)/i);
-  return match?.[1]?.trim() ?? null;
+  if (match?.[1]) return match[1].trim();
+  // Fallback: OCR may garble "DATE:" to "ATE:" or "TE:" when text is partially obscured
+  const fallback = text.match(/\bA?TE:\s*(\d{1,2}\/\d{2}\/\d{4})/i);
+  return fallback?.[1]?.trim() ?? null;
 }
 
 function extractSalesperson(text: string): string | null {
   const match = text.match(/SALESPERSON:\s*([A-Z][A-Z ]+)/i);
-  return match?.[1]?.trim() ?? null;
+  if (match?.[1]) return match[1].trim();
+  // Fallback: OCR may garble "SALESPERSON:" to "LESPERSON:", "ALESPERSON:", etc.
+  const fallback = text.match(/\bA?L?ESPERSON:\s*([A-Z][A-Z ]+)/i);
+  return fallback?.[1]?.trim() ?? null;
 }
 
 function extractStat(text: string): string | null {
