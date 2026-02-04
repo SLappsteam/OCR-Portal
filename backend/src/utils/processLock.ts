@@ -1,33 +1,54 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { logger } from './logger';
+import { parseSafeInteger } from './pathSafety';
 
 const DEFAULT_PORT = 3000;
+const MAX_PORT = 65535;
+const MAX_PID = 4194304;
 
 /**
- * Finds the PID of the process using a given port (Windows-only)
+ * Finds the PID of the process using a given port (Windows-only).
+ * Uses execFileSync to avoid shell interpolation.
  */
 function findProcessOnPort(port: number): number | null {
   try {
-    const result = execSync(`netstat -ano | findstr :${port} | findstr LISTENING`, {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    const result = execFileSync(
+      'cmd.exe',
+      ['/c', 'netstat', '-ano'],
+      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+    );
 
-    const match = result.trim().split('\n')[0]?.match(/\s+(\d+)\s*$/);
-    return match?.[1] ? parseInt(match[1], 10) : null;
+    const portStr = `:${port}`;
+    const match = result
+      .split('\n')
+      .find((line) => line.includes(portStr) && line.includes('LISTENING'));
+
+    if (!match) return null;
+
+    const pidMatch = match.trim().match(/\s+(\d+)\s*$/);
+    const pid = pidMatch?.[1] ? parseInt(pidMatch[1], 10) : null;
+
+    if (pid !== null && (pid < 1 || pid > MAX_PID)) return null;
+    return pid;
   } catch {
     return null;
   }
 }
 
 /**
- * Kills a process by PID (single process only, no tree-kill)
+ * Kills a process by PID (single process only, no tree-kill).
+ * PID is validated as a safe integer before execution.
  */
 function killProcess(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid < 1 || pid > MAX_PID) {
+    return false;
+  }
   try {
-    execSync(`taskkill /PID ${pid} /F`, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    execFileSync(
+      'taskkill',
+      ['/PID', String(pid), '/F'],
+      { stdio: ['pipe', 'pipe', 'pipe'] }
+    );
     return true;
   } catch {
     return false;
@@ -38,7 +59,14 @@ function killProcess(pid: number): boolean {
  * Check if port is available, optionally kill existing process
  */
 export function ensurePortAvailable(port?: number, autoKill = false): void {
-  const targetPort = port ?? parseInt(process.env['PORT'] ?? String(DEFAULT_PORT), 10);
+  const rawPort = port ?? parseInt(process.env['PORT'] ?? String(DEFAULT_PORT), 10);
+  const targetPort = parseSafeInteger(rawPort, 1, MAX_PORT);
+
+  if (targetPort === null) {
+    logger.error(`Invalid port number: ${rawPort}`);
+    return;
+  }
+
   const existingPid = findProcessOnPort(targetPort);
 
   if (!existingPid) {
@@ -50,7 +78,9 @@ export function ensurePortAvailable(port?: number, autoKill = false): void {
     if (killProcess(existingPid)) {
       logger.info(`Killed process ${existingPid}`);
       // Give it a moment to release the port
-      execSync('timeout /t 1 /nobreak >nul', { stdio: 'ignore' });
+      execFileSync('cmd.exe', ['/c', 'timeout', '/t', '1', '/nobreak'], {
+        stdio: 'ignore',
+      });
     } else {
       logger.error(`Failed to kill process ${existingPid}`);
       process.exit(1);
@@ -60,15 +90,12 @@ export function ensurePortAvailable(port?: number, autoKill = false): void {
       `Port ${targetPort} is already in use by PID ${existingPid}. ` +
       `Run: taskkill /PID ${existingPid} /F`
     );
-    // Don't exit - let the server try to bind and fail with EADDRINUSE
-    // This gives better error handling at the Express level
   }
 }
 
 // Legacy exports for backwards compatibility (no-ops)
 export function acquireLock(): void {
   // Deprecated - now a no-op
-  // Port conflict is handled by Express EADDRINUSE
 }
 
 export function releaseLock(): void {

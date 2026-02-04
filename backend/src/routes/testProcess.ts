@@ -7,6 +7,7 @@ import { processTiffScan, getBatchStatus } from '../services/batchProcessor';
 import { ApiResponse } from '../types';
 import { logger } from '../utils/logger';
 import { BadRequestError } from '../middleware/errorHandler';
+import { assertPathContained } from '../utils/pathSafety';
 
 const router = Router();
 
@@ -27,11 +28,11 @@ router.post(
         throw new BadRequestError(parsed.error.errors[0]?.message);
       }
 
-      const { filePath } = parsed.data;
-      logger.info(`Test: Analyzing TIFF at ${filePath}`);
+      const safePath = assertPathContained(parsed.data.filePath);
+      logger.info(`Test: Analyzing TIFF at ${safePath}`);
 
-      const metadata = await getTiffMetadata(filePath);
-      const boundaries = await analyzeTiff(filePath);
+      const metadata = await getTiffMetadata(safePath);
+      const boundaries = await analyzeTiff(safePath);
 
       const response: ApiResponse = {
         success: true,
@@ -89,8 +90,9 @@ router.post(
         throw new BadRequestError(parsed.error.errors[0]?.message);
       }
 
-      const { filePath, pageNumber } = parsed.data;
-      const pageBuffer = await extractPageAsPng(filePath, pageNumber);
+      const safePath = assertPathContained(parsed.data.filePath);
+      const { pageNumber } = parsed.data;
+      const pageBuffer = await extractPageAsPng(safePath, pageNumber);
       const rawBarcode = await detectBarcode(pageBuffer);
 
       const response: ApiResponse = {
