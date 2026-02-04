@@ -1,11 +1,16 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prisma';
 import { z } from 'zod';
-import { ApiResponse } from '../types';
+import { ApiResponse, CursorPaginatedResponse } from '../types';
 import { BadRequestError, NotFoundError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
 import { requireMinimumRole } from '../middleware/authorize';
 import { buildStoreWhereClause } from '../utils/storeFilter';
+import {
+  cursorPaginationSchema,
+  buildCursorWhere,
+  extractNextCursor,
+} from '../utils/pagination';
 
 const router = Router();
 
@@ -23,7 +28,7 @@ const querySchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   excludeCoversheets: z.string().optional(),
-});
+}).merge(cursorPaginationSchema);
 
 const updateSchema = z.object({
   storeId: z.number().int().positive().optional(),
@@ -37,40 +42,47 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       throw new BadRequestError('Invalid query parameters');
     }
 
-    const { storeNumber, documentType, startDate, endDate, excludeCoversheets } = parsed.data;
+    const { storeNumber, documentType, startDate, endDate, excludeCoversheets, cursor, limit } = parsed.data;
     const storeScope = buildStoreWhereClause(req.accessibleStoreIds);
 
-    const documents = await prisma.document.findMany({
-      where: {
-        batch: {
-          ...storeScope,
-          ...(storeNumber ? { store: { store_number: storeNumber } } : {}),
-        },
-        documentType: documentType ? { code: documentType } : undefined,
-        is_coversheet: excludeCoversheets === 'true' ? false : undefined,
-        created_at: {
-          gte: startDate ? new Date(startDate) : undefined,
-          lte: endDate ? new Date(endDate) : undefined,
-        },
+    const baseWhere = {
+      batch: {
+        ...storeScope,
+        ...(storeNumber ? { store: { store_number: storeNumber } } : {}),
       },
-      include: {
-        batch: {
-          select: {
-            id: true,
-            reference: true,
-            batch_type: true,
-            store: true,
+      documentType: documentType ? { code: documentType } : undefined,
+      is_coversheet: excludeCoversheets === 'true' ? false : undefined,
+      created_at: {
+        gte: startDate ? new Date(startDate) : undefined,
+        lte: endDate ? new Date(endDate) : undefined,
+      },
+    };
+    const cursorWhere = { ...baseWhere, ...buildCursorWhere(cursor) };
+
+    const [documents, totalCount] = await Promise.all([
+      prisma.document.findMany({
+        where: cursorWhere,
+        include: {
+          batch: {
+            select: {
+              id: true,
+              reference: true,
+              batch_type: true,
+              store: true,
+            },
+          },
+          documentType: true,
+          pageExtractions: {
+            orderBy: { page_number: 'asc' },
+            take: 1,
+            select: { fields: true, confidence: true },
           },
         },
-        documentType: true,
-        pageExtractions: {
-          orderBy: { page_number: 'asc' },
-          take: 1,
-          select: { fields: true, confidence: true },
-        },
-      },
-      orderBy: { created_at: 'desc' },
-    });
+        orderBy: { id: 'desc' },
+        take: limit,
+      }),
+      prisma.document.count({ where: baseWhere }),
+    ]);
 
     const serialized = documents.map((d) => {
       const raw = serializeDocument(d as unknown as Record<string, unknown>);
@@ -80,7 +92,13 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       delete raw['pageExtractions'];
       return raw;
     });
-    const response: ApiResponse = { success: true, data: serialized };
+    const nextCursor = extractNextCursor(documents, limit);
+    const response: CursorPaginatedResponse = {
+      success: true,
+      data: serialized,
+      nextCursor,
+      totalCount,
+    };
     res.json(response);
   } catch (error) {
     next(error);

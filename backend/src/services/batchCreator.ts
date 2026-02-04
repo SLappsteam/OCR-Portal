@@ -77,22 +77,27 @@ export async function createPageDocument(
     ? await getDocumentTypeByCode(docTypeCode)
     : null;
 
-  const doc = await prisma.document.create({
-    data: {
-      batch_id: batchId,
-      document_type_id: docType?.id ?? null,
-      page_number: pageNumber,
-      is_coversheet: isCoversheet,
-      status: 'pending',
-    },
+  const doc = await prisma.$transaction(async (tx) => {
+    const created = await tx.document.create({
+      data: {
+        batch_id: batchId,
+        document_type_id: docType?.id ?? null,
+        page_number: pageNumber,
+        is_coversheet: isCoversheet,
+        status: 'pending',
+      },
+    });
+
+    const reference = `${storeNumber}-${created.id}`;
+    await tx.document.update({
+      where: { id: created.id },
+      data: { reference },
+    });
+
+    return created;
   });
 
   const reference = `${storeNumber}-${doc.id}`;
-  await prisma.document.update({
-    where: { id: doc.id },
-    data: { reference },
-  });
-
   logger.info(
     `  Created document ${reference}: page=${pageNumber}` +
     (isCoversheet ? ' [coversheet]' : '') +

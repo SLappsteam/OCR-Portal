@@ -34,6 +34,13 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
   };
 }
 
+export interface CursorPaginatedResponse<T = unknown> {
+  success: boolean;
+  data: T[];
+  nextCursor: number | null;
+  totalCount: number;
+}
+
 export interface HealthCheckResponse {
   status: 'ok' | 'degraded' | 'error';
   timestamp: string;

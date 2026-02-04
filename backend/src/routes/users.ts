@@ -81,19 +81,21 @@ router.patch(
         throw new BadRequestError(parsed.error.errors[0]?.message ?? 'Invalid request');
       }
 
-      await prisma.userStoreAccess.deleteMany({ where: { user_id: userId } });
+      await prisma.$transaction(async (tx) => {
+        await tx.userStoreAccess.deleteMany({ where: { user_id: userId } });
 
-      if (parsed.data.stores.length > 0) {
-        await prisma.userStoreAccess.createMany({
-          data: parsed.data.stores.map((s) => ({
-            user_id: userId,
-            store_id: s.storeId,
-            can_view: s.canView,
-            can_upload: s.canUpload,
-            can_edit: s.canEdit,
-          })),
-        });
-      }
+        if (parsed.data.stores.length > 0) {
+          await tx.userStoreAccess.createMany({
+            data: parsed.data.stores.map((s) => ({
+              user_id: userId,
+              store_id: s.storeId,
+              can_view: s.canView,
+              can_upload: s.canUpload,
+              can_edit: s.canEdit,
+            })),
+          });
+        }
+      });
 
       logger.info(`User ${userId} store access updated`);
       res.json({ success: true, message: 'Store access updated' });

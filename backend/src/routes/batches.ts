@@ -1,12 +1,17 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prisma';
 import { z } from 'zod';
-import { ApiResponse } from '../types';
+import { ApiResponse, CursorPaginatedResponse } from '../types';
 import { BadRequestError, NotFoundError } from '../middleware/errorHandler';
 import { processTiffScan } from '../services/batchProcessor';
 import { logger } from '../utils/logger';
 import { requireMinimumRole, requireRole } from '../middleware/authorize';
 import { buildStoreWhereClause } from '../utils/storeFilter';
+import {
+  cursorPaginationSchema,
+  buildCursorWhere,
+  extractNextCursor,
+} from '../utils/pagination';
 
 const router = Router();
 
@@ -22,7 +27,7 @@ const querySchema = z.object({
   storeNumber: z.string().optional(),
   status: z.string().optional(),
   parentOnly: z.string().optional(),
-});
+}).merge(cursorPaginationSchema);
 
 const updateBatchSchema = z.object({
   storeId: z.number().int().positive(),
@@ -35,25 +40,38 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       throw new BadRequestError('Invalid query parameters');
     }
 
-    const { storeNumber, status, parentOnly } = parsed.data;
+    const { storeNumber, status, parentOnly, cursor, limit } = parsed.data;
     const storeScope = buildStoreWhereClause(req.accessibleStoreIds);
 
-    const batches = await prisma.batch.findMany({
-      where: {
-        ...storeScope,
-        store: storeNumber ? { store_number: storeNumber } : undefined,
-        status: status ?? undefined,
-        parent_batch_id: parentOnly === 'true' ? null : undefined,
-      },
-      include: {
-        store: true,
-        _count: { select: { documents: true, childBatches: true } },
-      },
-      orderBy: { created_at: 'desc' },
-    });
+    const baseWhere = {
+      ...storeScope,
+      store: storeNumber ? { store_number: storeNumber } : undefined,
+      status: status ?? undefined,
+      parent_batch_id: parentOnly === 'true' ? null : undefined,
+    };
+    const cursorWhere = { ...baseWhere, ...buildCursorWhere(cursor) };
+
+    const [batches, totalCount] = await Promise.all([
+      prisma.batch.findMany({
+        where: cursorWhere,
+        include: {
+          store: true,
+          _count: { select: { documents: true, childBatches: true } },
+        },
+        orderBy: { id: 'desc' },
+        take: limit,
+      }),
+      prisma.batch.count({ where: baseWhere }),
+    ]);
 
     const serialized = batches.map((b) => serializeBatch(b as Record<string, unknown>));
-    const response: ApiResponse = { success: true, data: serialized };
+    const nextCursor = extractNextCursor(batches, limit);
+    const response: CursorPaginatedResponse = {
+      success: true,
+      data: serialized,
+      nextCursor,
+      totalCount,
+    };
     res.json(response);
   } catch (error) {
     next(error);
@@ -180,26 +198,28 @@ router.post(
         throw new BadRequestError('Can only reprocess failed batches');
       }
 
-      const childBatches = await prisma.batch.findMany({
-        where: { parent_batch_id: id },
-        select: { id: true },
-      });
-      const childIds = childBatches.map((b) => b.id);
-
-      if (childIds.length > 0) {
-        await prisma.document.deleteMany({
-          where: { batch_id: { in: childIds } },
+      await prisma.$transaction(async (tx) => {
+        const childBatches = await tx.batch.findMany({
+          where: { parent_batch_id: id },
+          select: { id: true },
         });
-        await prisma.batch.deleteMany({
-          where: { id: { in: childIds } },
+        const childIds = childBatches.map((b) => b.id);
+
+        if (childIds.length > 0) {
+          await tx.document.deleteMany({
+            where: { batch_id: { in: childIds } },
+          });
+          await tx.batch.deleteMany({
+            where: { id: { in: childIds } },
+          });
+        }
+
+        await tx.document.deleteMany({ where: { batch_id: id } });
+
+        await tx.batch.update({
+          where: { id },
+          data: { status: 'pending', error_message: null, batch_type: null },
         });
-      }
-
-      await prisma.document.deleteMany({ where: { batch_id: id } });
-
-      await prisma.batch.update({
-        where: { id },
-        data: { status: 'pending', error_message: null, batch_type: null },
       });
 
       logger.info(`Reprocessing batch ${id}`);

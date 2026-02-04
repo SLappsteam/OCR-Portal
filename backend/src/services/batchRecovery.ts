@@ -15,28 +15,30 @@ export async function recoverStuckBatches(): Promise<void> {
 
     const ids = stuck.map((b) => b.id);
 
-    const childBatches = await prisma.batch.findMany({
-      where: { parent_batch_id: { in: ids } },
-      select: { id: true },
-    });
-    const childIds = childBatches.map((b) => b.id);
-
-    if (childIds.length > 0) {
-      await prisma.document.deleteMany({
-        where: { batch_id: { in: childIds } },
+    await prisma.$transaction(async (tx) => {
+      const childBatches = await tx.batch.findMany({
+        where: { parent_batch_id: { in: ids } },
+        select: { id: true },
       });
-      await prisma.batch.deleteMany({
-        where: { id: { in: childIds } },
+      const childIds = childBatches.map((b) => b.id);
+
+      if (childIds.length > 0) {
+        await tx.document.deleteMany({
+          where: { batch_id: { in: childIds } },
+        });
+        await tx.batch.deleteMany({
+          where: { id: { in: childIds } },
+        });
+      }
+
+      await tx.document.deleteMany({
+        where: { batch_id: { in: ids } },
       });
-    }
 
-    await prisma.document.deleteMany({
-      where: { batch_id: { in: ids } },
-    });
-
-    await prisma.batch.updateMany({
-      where: { id: { in: ids } },
-      data: { status: 'pending', error_message: null, batch_type: null },
+      await tx.batch.updateMany({
+        where: { id: { in: ids } },
+        data: { status: 'pending', error_message: null, batch_type: null },
+      });
     });
 
     for (const { id } of stuck) {
