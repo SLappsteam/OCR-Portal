@@ -74,6 +74,11 @@ const documentTypes = [
     name: 'Cash Drawer Report',
     description: 'Cash drawer reconciliation summary with transaction totals',
   },
+  {
+    code: 'DEPOSIT_TICKET',
+    name: 'Deposit Ticket',
+    description: 'Bank deposit slips with handwritten amounts',
+  },
 ];
 
 async function main(): Promise<void> {

@@ -11,6 +11,7 @@ import {
   parseTransactionReceipt,
   calculateReceiptConfidence,
 } from './extraction/transactionReceiptParser';
+import { isDepositTicket } from './extraction/depositTicketParser';
 import { scanBarcodeInRegion, getDocumentTypeByCode } from './barcodeService';
 import { parseManifestOrders } from './manifestDetector';
 import { logger } from '../utils/logger';
@@ -137,6 +138,16 @@ async function ocrAndParse(
       raw_text: text,
       confidence: calculateReceiptConfidence(receiptFields),
       documentType: 'RECEIPT',
+    };
+  }
+
+  // Check for Deposit Ticket pages (bank deposit slips)
+  if (isDepositTicket(text)) {
+    return {
+      fields: {},
+      raw_text: text,
+      confidence: 1,
+      documentType: 'DEPOSIT_TICKET',
     };
   }
 
