@@ -1,9 +1,10 @@
 import sharp from 'sharp';
 import Tesseract from 'tesseract.js';
 import { logger } from '../utils/logger';
-import { ocrRecognize } from './ocrPool';
+import { ocrWithRotationRetry } from '../utils/ocrRetry';
 
 const ORIENTATION_CONFIDENCE_THRESHOLD = 10;
+const ORIENTATION_CONFIDENCE_MAX = 70;
 const DESKEW_ANGLE_THRESHOLD = 0.5;
 const MAX_DESKEW_ANGLE = 10;
 
@@ -64,28 +65,17 @@ export async function correctPageImage(
 ): Promise<Buffer> {
   try {
     const sample = await sampleUnifiedRegion(imageBuffer);
-    const normalResult = await ocrRecognize(sample);
+    const ocrResult = await ocrWithRotationRetry(
+      sample, ORIENTATION_CONFIDENCE_MAX, ORIENTATION_CONFIDENCE_THRESHOLD
+    );
 
-    let rotation = 0;
-    let skewBlocks = normalResult.data.blocks;
-
-    if (normalResult.data.confidence <= 70) {
-      const rotated180 = await sharp(sample).rotate(180).png().toBuffer();
-      const flippedResult = await ocrRecognize(rotated180);
-
-      if (flippedResult.data.confidence > normalResult.data.confidence + ORIENTATION_CONFIDENCE_THRESHOLD) {
-        logger.info(
-          `Page upside-down: conf ${normalResult.data.confidence.toFixed(1)} vs rotated ${flippedResult.data.confidence.toFixed(1)}`
-        );
-        rotation = 180;
-        skewBlocks = flippedResult.data.blocks;
-      }
-    }
-
+    const isRotated = ocrResult.buffer !== sample;
     let corrected = imageBuffer;
-    if (rotation !== 0) {
-      corrected = await sharp(corrected).rotate(rotation).png().toBuffer();
+    if (isRotated) {
+      corrected = await sharp(corrected).rotate(180).png().toBuffer();
     }
+
+    const skewBlocks = ocrResult.data?.blocks ?? null;
 
     const lines = extractLinesFromBlocks(skewBlocks);
     const skew = calculateSkewFromLines(lines);

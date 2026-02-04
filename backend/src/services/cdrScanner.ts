@@ -3,7 +3,7 @@ import { prisma } from '../utils/prisma';
 import sharp from 'sharp';
 import { extractPageAsPng } from './tiffService';
 import { correctPageImage } from './imageCorrection';
-import { ocrRecognize } from './ocrPool';
+import { ocrWithRotationRetry } from '../utils/ocrRetry';
 import { isTicketPage, parseTicketText, calculateTicketConfidence } from './extraction/ticketParser';
 import { parseFinsalesPage, calculateConfidence } from './extraction/finsalesParser';
 import { isCdrReport, parseCdrReport, calculateCdrConfidence } from './extraction/cdrReportParser';
@@ -83,42 +83,50 @@ async function ocrAndParse(
   const png = await extractPageAsPng(filePath, page);
   const corrected = await correctPageImage(png);
 
-  // First OCR pass - try normal orientation
-  let { text, confidence: ocrConf } = await ocrWithConfidence(corrected);
-  let activeBuffer = corrected;
+  const ocrResult = await ocrWithRotationRetry(corrected, LOW_CONFIDENCE_THRESHOLD);
 
-  // If low confidence, try 180° rotation (upside down page)
-  if (ocrConf < LOW_CONFIDENCE_THRESHOLD) {
-    const flipped = await sharp(corrected).rotate(180).png().toBuffer();
-    const flipped$ = await ocrWithConfidence(flipped);
-    if (flipped$.confidence > ocrConf + 10) {
-      logger.info(`Page upside-down: conf ${ocrConf.toFixed(1)} vs rotated ${flipped$.confidence.toFixed(1)}`);
-      text = flipped$.text;
-      ocrConf = flipped$.confidence;
-      activeBuffer = flipped;
-    }
+  const manifestResult = await tryParseManifest(
+    corrected, ocrResult.text, ocrResult.confidence
+  );
+  if (manifestResult) return manifestResult;
+
+  return classifyAndParseText(ocrResult.text, ocrResult.buffer);
+}
+
+async function tryParseManifest(
+  corrected: Buffer,
+  text: string,
+  ocrConf: number
+): Promise<ParsedPage | null> {
+  if (ocrConf >= LOW_CONFIDENCE_THRESHOLD && !hasManifestHints(text)) {
+    return null;
   }
 
-  // Check for manifest page (landscape tabular data)
-  // Manifests need 90° CCW rotation - try if we see column headers or multiple order IDs
-  if (ocrConf < LOW_CONFIDENCE_THRESHOLD || hasManifestHints(text)) {
-    const rotated90 = await sharp(corrected).rotate(270).png().toBuffer();
-    const rotated$ = await ocrWithConfidence(rotated90);
-    if (rotated$.confidence > ocrConf) {
-      const manifestOrders = parseManifestOrders(rotated$.text);
-      if (manifestOrders.length >= 2) {
-        logger.info(`  Manifest detection: 90° CCW rotation improved OCR`);
-        return {
-          fields: { orders: manifestOrders, order_count: manifestOrders.length },
-          raw_text: rotated$.text,
-          confidence: rotated$.confidence / 100,
-          documentType: 'MANIFEST',
-        };
-      }
-    }
+  const rotated90 = await sharp(corrected).rotate(270).png().toBuffer();
+  const rotatedResult = await ocrWithRotationRetry(rotated90, 0);
+
+  if (rotatedResult.confidence <= ocrConf) {
+    return null;
   }
 
-  // Check for Cash Drawer Report pages
+  const manifestOrders = parseManifestOrders(rotatedResult.text);
+  if (manifestOrders.length < 2) {
+    return null;
+  }
+
+  logger.info(`  Manifest detection: 90° CCW rotation improved OCR`);
+  return {
+    fields: { orders: manifestOrders, order_count: manifestOrders.length },
+    raw_text: rotatedResult.text,
+    confidence: rotatedResult.confidence / 100,
+    documentType: 'MANIFEST',
+  };
+}
+
+async function classifyAndParseText(
+  text: string,
+  activeBuffer: Buffer
+): Promise<ParsedPage> {
   if (isCdrReport(text)) {
     const cdrFields = parseCdrReport(text);
     return {
@@ -129,7 +137,6 @@ async function ocrAndParse(
     };
   }
 
-  // Check for Transaction Receipt pages
   if (isTransactionReceipt(text)) {
     const receiptFields = parseTransactionReceipt(text);
     return {
@@ -140,36 +147,16 @@ async function ocrAndParse(
     };
   }
 
-  // Check for Deposit Ticket pages (bank deposit slips)
   if (isDepositTicket(text)) {
-    return {
-      fields: {},
-      raw_text: text,
-      confidence: 1,
-      documentType: 'DEPOSIT_TICKET',
-    };
+    return { fields: {}, raw_text: text, confidence: 1, documentType: 'DEPOSIT_TICKET' };
   }
 
-  // Check if content matches invoice patterns (sales tickets, financing docs)
   if (!isInvoiceContent(text)) {
-    return {
-      fields: {},
-      raw_text: text,
-      confidence: 0,
-      documentType: 'UNKNOWN',
-    };
+    return { fields: {}, raw_text: text, confidence: 0, documentType: 'UNKNOWN' };
   }
 
   if (isTicketPage(text)) {
-    const fields = parseTicketText(text);
-    const barcode = await scanBarcodeInRegion(activeBuffer, 0.65, 0.35);
-    if (barcode) fields.order_id = barcode;
-    return {
-      fields,
-      raw_text: text,
-      confidence: calculateTicketConfidence(fields),
-      documentType: 'INVOICE',
-    };
+    return await parseTicketPage(text, activeBuffer);
   }
 
   const fields = parseFinsalesPage(text);
@@ -181,18 +168,25 @@ async function ocrAndParse(
   };
 }
 
-// Quick check for manifest hints before trying 90° rotation
+async function parseTicketPage(
+  text: string,
+  activeBuffer: Buffer
+): Promise<ParsedPage> {
+  const fields = parseTicketText(text);
+  const barcode = await scanBarcodeInRegion(activeBuffer, 0.65, 0.35);
+  if (barcode) fields.order_id = barcode;
+  return {
+    fields,
+    raw_text: text,
+    confidence: calculateTicketConfidence(fields),
+    documentType: 'INVOICE',
+  };
+}
+
 function hasManifestHints(text: string): boolean {
   const orderPattern = /\b\d{7,}[A-Z]{1,2}\b/g;
   const matches = text.match(orderPattern);
   return (matches?.length ?? 0) >= 2;
-}
-
-async function ocrWithConfidence(
-  buf: Buffer
-): Promise<{ text: string; confidence: number }> {
-  const result = await ocrRecognize(buf);
-  return { text: result.data.text, confidence: result.data.confidence };
 }
 
 async function storePageExtraction(

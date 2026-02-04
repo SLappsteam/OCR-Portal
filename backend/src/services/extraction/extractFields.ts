@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import { extractPageAsPng } from '../tiffService';
 import { correctPageImage } from '../imageCorrection';
 import { ocrRecognize } from '../ocrPool';
+import { ocrWithRotationRetry } from '../../utils/ocrRetry';
 import { parseFinsalesPage, calculateConfidence } from './finsalesParser';
 import { parseSummaryText, isSummaryPage, SummaryOrder } from './summaryParser';
 import { isTicketPage, parseTicketText, calculateTicketConfidence } from './ticketParser';
@@ -71,21 +72,9 @@ export async function extractSinglePage(
     }
 
     const corrected = await correctPageImage(pageBuffer);
-    let { text: rawText, confidence: ocrConf } = await ocrPageWithConfidence(corrected);
-    let activeBuffer = corrected;
-
-    if (ocrConf < LOW_CONFIDENCE_THRESHOLD) {
-      const flipped = await sharp(corrected).rotate(180).png().toBuffer();
-      const flippedResult = await ocrPageWithConfidence(flipped);
-      if (flippedResult.confidence > ocrConf + 10) {
-        logger.info(
-          `Page ${pageNumber}: low OCR confidence (${ocrConf.toFixed(0)}%), ` +
-          `retrying 180° (${flippedResult.confidence.toFixed(0)}%)`
-        );
-        activeBuffer = flipped;
-        rawText = flippedResult.text;
-      }
-    }
+    const ocrResult = await ocrWithRotationRetry(corrected, LOW_CONFIDENCE_THRESHOLD);
+    const rawText = ocrResult.text;
+    const activeBuffer = ocrResult.buffer;
 
     if (isTicketPage(rawText)) {
       return await tryExtractTicket(activeBuffer, rawText, pageNumber, docTypeCode);
@@ -260,11 +249,4 @@ async function tryExtractTicket(
 async function ocrPage(imageBuffer: Buffer): Promise<string> {
   const result = await ocrRecognize(imageBuffer);
   return result.data.text;
-}
-
-async function ocrPageWithConfidence(
-  imageBuffer: Buffer
-): Promise<{ text: string; confidence: number }> {
-  const result = await ocrRecognize(imageBuffer);
-  return { text: result.data.text, confidence: result.data.confidence };
 }

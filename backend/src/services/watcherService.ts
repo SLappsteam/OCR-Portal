@@ -1,39 +1,23 @@
 import chokidar, { FSWatcher } from 'chokidar';
 import path from 'path';
-import { stat } from 'fs/promises';
 import sharp from 'sharp';
-import { Prisma } from '@prisma/client';
-import { prisma } from '../utils/prisma';
 import { logger } from '../utils/logger';
-import { calculateFileHash, parseLocationInfo, LocationInfo } from '../utils/fileUtils';
 import { storeFile, archiveFile } from './storageService';
-import { processTiffScan } from './batchProcessor';
 import { setWatcherStatus } from '../routes/settings';
-const MAX_REFERENCE_RETRIES = 10;
-const MAX_CONCURRENT_BATCHES = parseInt(process.env['MAX_CONCURRENT_BATCHES'] ?? '4', 10);
+import {
+  isDuplicateFile,
+  validateAndHashFile,
+  FileInfo,
+  resolveStorageFolder,
+  resolveStoreId,
+  createBatchWithRetry,
+  archiveFileSafely,
+  scheduleBatchProcessing,
+} from './watcherHelpers';
 
 let watcher: FSWatcher | null = null;
 const DEBOUNCE_MS = 2000;
 const processingFiles = new Set<string>();
-let activeBatches = 0;
-const batchQueue: Array<() => void> = [];
-
-function acquireBatchSlot(): Promise<void> {
-  if (activeBatches < MAX_CONCURRENT_BATCHES) {
-    activeBatches++;
-    return Promise.resolve();
-  }
-  return new Promise((resolve) => batchQueue.push(resolve));
-}
-
-function releaseBatchSlot(): void {
-  const next = batchQueue.shift();
-  if (next) {
-    next();
-  } else {
-    activeBatches--;
-  }
-}
 
 async function isValidTiff(filePath: string): Promise<boolean> {
   try {
@@ -44,108 +28,27 @@ async function isValidTiff(filePath: string): Promise<boolean> {
   }
 }
 
-async function isDuplicateFile(fileHash: string): Promise<boolean> {
-  const existing = await prisma.batch.findFirst({
-    where: { file_hash: fileHash, parent_batch_id: null },
-  });
-  return existing !== null;
-}
-
-async function getOrCreateLocation(locationInfo: LocationInfo): Promise<number> {
-  const storeNumber = `${locationInfo.type === 'dc' ? 'DC' : 'ST'}${locationInfo.identifier}`;
-
-  let store = await prisma.store.findUnique({
-    where: { store_number: storeNumber },
-  });
-
-  if (!store) {
-    store = await prisma.store.create({
-      data: {
-        store_number: storeNumber,
-        name: locationInfo.displayName,
-      },
-    });
-    logger.info(`Created new location: ${locationInfo.displayName}`);
-  }
-
-  return store.id;
-}
-
-async function getOrCreateUnassigned(): Promise<number> {
-  let store = await prisma.store.findUnique({
-    where: { store_number: UNASSIGNED_STORE },
-  });
-
-  if (!store) {
-    store = await prisma.store.create({
-      data: {
-        store_number: UNASSIGNED_STORE,
-        name: 'Unassigned',
-      },
-    });
-    logger.info('Created UNASSIGNED location');
-  }
-
-  return store.id;
-}
-
-const UNASSIGNED_STORE = 'UNASSIGNED';
-const REFERENCE_START = 100001;
-
-async function generateReference(locationCode: string): Promise<string> {
-  const lastBatch = await prisma.batch.findFirst({
-    where: {
-      reference: { startsWith: locationCode },
-    },
-    orderBy: { reference: 'desc' },
-    select: { reference: true },
-  });
-
-  if (!lastBatch?.reference) {
-    return `${locationCode}${REFERENCE_START}`;
-  }
-
-  const lastNumber = parseInt(lastBatch.reference.slice(locationCode.length), 10);
-  const nextNumber = lastNumber + 1;
-  return `${locationCode}${nextNumber}`;
-}
-
-async function createBatchWithRetry(
-  storeId: number,
-  storageFolder: string,
-  filename: string,
-  fileHash: string,
-  storedPath: string,
-  fileSize: number
+async function ingestValidatedFile(
+  filePath: string,
+  fileInfo: FileInfo
 ): Promise<{ id: number } | null> {
-  for (let attempt = 0; attempt < MAX_REFERENCE_RETRIES; attempt++) {
-    const reference = await generateReference(storageFolder);
+  const storageFolder = resolveStorageFolder(fileInfo.locationInfo);
+  const storedPath = await storeFile(filePath, storageFolder);
+  const storeId = await resolveStoreId(fileInfo.locationInfo);
 
-    try {
-      return await prisma.batch.create({
-        data: {
-          store_id: storeId,
-          reference,
-          file_hash: fileHash,
-          file_name: filename,
-          file_path: storedPath,
-          file_size_bytes: fileSize,
-          status: 'pending',
-        },
-      });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        logger.warn(`Reference collision on ${reference}, retrying (${attempt + 1}/${MAX_REFERENCE_RETRIES})...`);
-        continue;
-      }
-      throw error;
-    }
+  const batch = await createBatchWithRetry(
+    storeId, storageFolder, fileInfo.filename,
+    fileInfo.fileHash, storedPath, fileInfo.fileSize
+  );
+
+  if (!batch) {
+    await archiveFileSafely(filePath);
+    return null;
   }
 
-  throw new Error(`Failed to create batch after ${MAX_REFERENCE_RETRIES} retries`);
+  logger.info(`  Created batch ${batch.id} (ref=${storageFolder}) for ${fileInfo.locationInfo?.displayName ?? 'UNASSIGNED'}`);
+  await archiveFileSafely(filePath, batch.id);
+  return batch;
 }
 
 async function processNewFile(filePath: string): Promise<void> {
@@ -167,76 +70,20 @@ async function processNewFile(filePath: string): Promise<void> {
       return;
     }
 
-    const locationInfo = parseLocationInfo(filename);
+    const fileInfo = await validateAndHashFile(filePath);
+    if (!fileInfo) return;
 
-    if (!locationInfo) {
-      logger.warn(`Cannot parse location from: ${filename}, assigning to UNASSIGNED`);
-    }
-
-    const fileStats = await stat(filePath);
-    const sizeMB = (fileStats.size / (1024 * 1024)).toFixed(2);
-
-    const fileHash = await calculateFileHash(filePath);
-    logger.info(`  File: ${filename}, size=${sizeMB}MB, hash=${fileHash.substring(0, 12)}, location=${locationInfo?.displayName ?? 'UNASSIGNED'}`);
-
-    if (await isDuplicateFile(fileHash)) {
-      logger.warn(`  Duplicate file detected, skipping: ${filename} (hash=${fileHash.substring(0, 12)})`);
+    if (await isDuplicateFile(fileInfo.fileHash)) {
+      logger.warn(`  Duplicate file detected, skipping: ${filename} (hash=${fileInfo.fileHash.substring(0, 12)})`);
       await archiveFile(filePath);
       return;
     }
 
-    const storageFolder = locationInfo
-      ? `${locationInfo.type === 'dc' ? 'DC' : 'ST'}${locationInfo.identifier}`
-      : UNASSIGNED_STORE;
-
-    const storedPath = await storeFile(filePath, storageFolder);
-    const storeId = locationInfo
-      ? await getOrCreateLocation(locationInfo)
-      : await getOrCreateUnassigned();
-
-    const batch = await createBatchWithRetry(
-      storeId,
-      storageFolder,
-      filename,
-      fileHash,
-      storedPath,
-      fileStats.size
-    );
-
-    if (!batch) {
-      try {
-        await archiveFile(filePath);
-      } catch {
-        // Ignore archive errors for duplicates
-      }
-      return;
-    }
-
-    logger.info(`  Created batch ${batch.id} (ref=${storageFolder}) for ${locationInfo?.displayName ?? 'UNASSIGNED'}`);
-
-    try {
-      await archiveFile(filePath);
-    } catch (archiveError) {
-      logger.warn(`Failed to archive ${filename}, but batch ${batch.id} will still be processed:`, archiveError);
-    }
+    const batch = await ingestValidatedFile(filePath, fileInfo);
+    if (!batch) return;
 
     handedOffToBackground = true;
-    setImmediate(async () => {
-      try {
-        await acquireBatchSlot();
-        try {
-          await processTiffScan(batch.id);
-        } catch (err) {
-          logger.error(`Background processing failed for batch ${batch.id}:`, err);
-        } finally {
-          releaseBatchSlot();
-        }
-      } catch (slotErr) {
-        logger.error(`Failed to acquire batch slot for batch ${batch.id}:`, slotErr);
-      } finally {
-        processingFiles.delete(filePath);
-      }
-    });
+    scheduleBatchProcessing(batch.id, filePath, processingFiles);
   } catch (error) {
     logger.error(`Error processing file ${filename}:`, error);
   } finally {
