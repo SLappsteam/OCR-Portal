@@ -15,12 +15,16 @@ import usersRouter from './users';
 import { authenticate } from '../middleware/authenticate';
 import { requireRole } from '../middleware/authorize';
 import { storeScope } from '../middleware/storeScope';
+import { ocrLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
 router.use('/health', healthRouter);
 router.use('/api/auth', authRouter);
 router.use('/api/auth/oidc', oidcRouter);
+
+router.post('/api/test/analyze-tiff', ocrLimiter);
+router.post('/api/batches/:id/reprocess', ocrLimiter);
 
 router.use('/api/test', authenticate, requireRole('admin'), testProcessRouter);
 router.use('/api/documents', authenticate, storeScope, documentsRouter);

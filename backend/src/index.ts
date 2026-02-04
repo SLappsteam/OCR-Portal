@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { Server } from 'http';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
+import { generalLimiter } from './middleware/rateLimiter';
 import { routes } from './routes';
 import { startWatcher, stopWatcher } from './services/watcherService';
 import { ensureStorageDirectories } from './services/storageService';
@@ -32,8 +33,9 @@ app.use(cors({
   credentials: true,
 }));
 app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+app.use(generalLimiter);
 
 app.use('/', routes);
 
