@@ -16,7 +16,7 @@ import {
   calculateCdrConfidence,
 } from './cdrReportParser';
 import { scanBarcodeInRegion } from '../barcodeService';
-import { PageExtractionResult } from './types';
+import { PageExtractionResult, PageFields } from './types';
 import { logger } from '../../utils/logger';
 
 // Batch types that support invoice extraction
@@ -136,7 +136,7 @@ async function tryExtractSummary(
   return {
     page_number: pageNumber,
     document_type: docTypeCode,
-    fields: { orders } as unknown as PageExtractionResult['fields'],
+    fields: { orders } as PageFields,
     confidence,
     raw_text: rawText,
   };
@@ -200,7 +200,7 @@ function buildSummaryResult(
   return {
     page_number: pageNumber,
     document_type: docTypeCode,
-    fields: { orders } as unknown as PageExtractionResult['fields'],
+    fields: { orders } as PageFields,
     confidence,
     raw_text: rawText,
   };
@@ -222,7 +222,7 @@ function buildCdrReportResult(
   return {
     page_number: pageNumber,
     document_type: 'CDR_REPORT',
-    fields: fields as unknown as PageExtractionResult['fields'],
+    fields: fields as PageFields,
     confidence,
     raw_text: rawText,
   };

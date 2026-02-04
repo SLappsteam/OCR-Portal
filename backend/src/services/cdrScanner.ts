@@ -57,7 +57,7 @@ export async function classifyPageContent(
 }
 
 interface ParsedPage {
-  fields: unknown;
+  fields: Record<string, unknown>;
   raw_text: string;
   confidence: number;
   documentType: string;
@@ -209,7 +209,7 @@ async function storePageExtraction(
     page_number: page,
     fields: {
       document_type: result.documentType,
-      ...(result.fields as Record<string, unknown>),
+      ...result.fields,
     } as Prisma.JsonObject,
     raw_text: result.raw_text,
     confidence: result.confidence,

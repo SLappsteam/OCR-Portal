@@ -1,4 +1,4 @@
-export interface FinsalesData {
+export type FinsalesData = {
   fulfillment: string | null;
   order_type: string | null;
   order_id: string | null;
@@ -20,9 +20,9 @@ export interface FinsalesData {
   customer_code: string | null;
   finance_company: string | null;
   financed_amount: string | null;
-}
+};
 
-export interface CdrReportData {
+export type CdrReportData = {
   cash_drawers: number[];
   grand_total: string | null;
   total_refund: string | null;
@@ -30,25 +30,38 @@ export interface CdrReportData {
   order_ids: string[];
   payment_site: string | null;
   post_date: string | null;
-}
+};
 
-export interface ReceiptTransaction {
+export type ReceiptTransaction = {
   date: string | null;
   payment_type: string | null;
   amount: string | null;
-}
+};
 
-export interface ExtractionResult {
+export type SummaryFields = {
+  orders: Array<{ order_id: string; customer_name: string }>;
+  order_count?: number;
+};
+
+/** Union of all page extraction field shapes */
+export type PageFields =
+  | FinsalesData
+  | (FinsalesData & { transactions: ReceiptTransaction[] })
+  | CdrReportData
+  | SummaryFields
+  | Record<string, never>;
+
+export type ExtractionResult = {
   document_type: string;
-  fields: FinsalesData;
+  fields: PageFields;
   confidence: number;
   raw_text: string;
-}
+};
 
-export interface PageExtractionResult {
+export type PageExtractionResult = {
   page_number: number;
   document_type: string;
-  fields: FinsalesData;
+  fields: PageFields;
   confidence: number;
   raw_text: string;
-}
+};

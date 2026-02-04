@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Folder, HardDrive, Archive, Activity, Trash2 } from 'lucide-react';
+import { Activity, Trash2 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import type { ApiResponse } from '../types';
 import { OidcSettingsSection } from '../components/OidcSettingsSection';
 
 interface SettingsData {
-  watchFolderPath: string;
-  storagePath: string;
-  archivePath: string;
   watcherStatus: 'running' | 'stopped';
 }
 
@@ -95,70 +92,7 @@ export function Settings() {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-5">
-        <div className="flex items-start gap-4">
-          <div className="p-2 bg-gray-100 rounded">
-            <Folder size={20} className="text-gray-600" />
-          </div>
-          <div className="flex-1">
-            <h3 className="font-medium text-gray-900">
-              Watch Folder
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Place TIFF files in this folder to automatically process them.
-            </p>
-            <div className="mt-2 p-2 bg-gray-50 rounded font-mono text-sm text-gray-700 break-all">
-              {settings.watchFolderPath}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
-        <div className="p-4">
-          <div className="flex items-start gap-4">
-            <div className="p-2 bg-gray-100 rounded">
-              <HardDrive size={20} className="text-gray-600" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-medium text-gray-900">TIFF Storage</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Processed TIFFs are stored here, organized by store and date.
-              </p>
-              <div className="mt-2 p-2 bg-gray-50 rounded font-mono text-sm text-gray-700 break-all">
-                {settings.storagePath}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-4">
-          <div className="flex items-start gap-4">
-            <div className="p-2 bg-gray-100 rounded">
-              <Archive size={20} className="text-gray-600" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-medium text-gray-900">Archive Folder</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Original files are moved here after processing.
-              </p>
-              <div className="mt-2 p-2 bg-gray-50 rounded font-mono text-sm text-gray-700 break-all">
-                {settings.archivePath}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <OidcSettingsSection />
-
-      <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
-        <p>
-          <strong>Note:</strong> Configuration paths are set in the backend{' '}
-          <code className="bg-gray-200 px-1 rounded">.env</code> file. Restart
-          the server after making changes.
-        </p>
-      </div>
 
       <div className="bg-white border border-gray-200 rounded-lg p-5">
         <div className="flex items-start gap-4">

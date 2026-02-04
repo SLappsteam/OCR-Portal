@@ -9,19 +9,24 @@ const OCR_NOISE_CHARS = /[^A-Z0-9]/g;
 // Content allows OCR noise chars (?, !, .) that get stripped during cleanup.
 const BARCODE_TEXT_PATTERN = /[*"'+]([A-Z0-9][A-Z0-9?!.,;: ]{1,11})[*"'~?)\]|]/;
 
-let scanImageData: typeof import('@undecaf/zbar-wasm').scanImageData;
+/** Convert Node.js Buffer to a plain ArrayBuffer (for zbar-wasm) */
+function bufferToArrayBuffer(buf: Buffer): ArrayBuffer {
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+}
+
+let scanRgba: typeof import('@undecaf/zbar-wasm').scanRGBABuffer;
 
 async function getZbarScanner() {
-  if (!scanImageData) {
+  if (!scanRgba) {
     const zbar = await import('@undecaf/zbar-wasm');
-    scanImageData = zbar.scanImageData;
+    scanRgba = zbar.scanRGBABuffer;
   }
-  return scanImageData;
+  return scanRgba;
 }
 
 async function cropForBarcode(
   imageBuffer: Buffer
-): Promise<{ data: Uint8ClampedArray; width: number; height: number }> {
+): Promise<{ data: ArrayBuffer; width: number; height: number }> {
   const metadata = await sharp(imageBuffer).metadata();
   const width = metadata.width ?? 1700;
   const height = metadata.height ?? 2200;
@@ -36,7 +41,7 @@ async function cropForBarcode(
     .toBuffer({ resolveWithObject: true });
 
   return {
-    data: new Uint8ClampedArray(data),
+    data: bufferToArrayBuffer(data),
     width: info.width,
     height: info.height,
   };
@@ -48,7 +53,7 @@ async function detectBarcodeWithZbar(
   try {
     const scan = await getZbarScanner();
     const { data, width, height } = await cropForBarcode(imageBuffer);
-    const results = await scan({ data, width, height } as any);
+    const results = await scan(data, width, height);
     const first = results[0];
     if (first) {
       return first.decode();
@@ -119,11 +124,7 @@ export async function scanBarcodeInRegion(
       .raw()
       .toBuffer({ resolveWithObject: true });
 
-    const results = await scan({
-      data: new Uint8ClampedArray(data),
-      width: info.width,
-      height: info.height,
-    } as any);
+    const results = await scan(bufferToArrayBuffer(data), info.width, info.height);
 
     const first = results[0];
     return first ? first.decode() : null;
