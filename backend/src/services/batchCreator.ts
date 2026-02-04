@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import { getDocumentTypeByCode } from './barcodeService';
 import { logger } from '../utils/logger';
-
-const prisma = new PrismaClient();
 const REFERENCE_START = 100001;
 
 export function generateChildReference(

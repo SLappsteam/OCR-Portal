@@ -1,9 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import { ApiResponse } from '../types';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 interface DashboardStats {
   totalDocuments: number;

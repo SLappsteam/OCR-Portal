@@ -14,7 +14,7 @@ function findProcessOnPort(port: number): number | null {
     });
 
     const match = result.trim().split('\n')[0]?.match(/\s+(\d+)\s*$/);
-    return match ? parseInt(match[1], 10) : null;
+    return match?.[1] ? parseInt(match[1], 10) : null;
   } catch {
     return null;
   }

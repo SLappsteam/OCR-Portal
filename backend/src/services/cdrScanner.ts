@@ -1,4 +1,5 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import sharp from 'sharp';
 import { extractPageAsPng } from './tiffService';
 import { correctPageImage } from './imageCorrection';
@@ -15,8 +16,6 @@ import { isDepositTicket } from './extraction/depositTicketParser';
 import { scanBarcodeInRegion, getDocumentTypeByCode } from './barcodeService';
 import { parseManifestOrders } from './manifestDetector';
 import { logger } from '../utils/logger';
-
-const prisma = new PrismaClient();
 
 const FINSALES_HEADER = /TYPE\s*:.*STAT\s*[.:]/i;
 const CREDIT_HEADER = /CREDIT\s*:\s*\d/i;

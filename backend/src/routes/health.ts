@@ -1,10 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import { HealthCheckResponse, ApiResponse } from '../types';
 import { logger } from '../utils/logger';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 router.get('/', async (_req: Request, res: Response) => {
   let databaseStatus: 'connected' | 'disconnected' = 'disconnected';

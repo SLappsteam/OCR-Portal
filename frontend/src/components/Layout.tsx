@@ -6,21 +6,23 @@ import {
   Store,
   Settings,
   User,
+  LogOut,
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface NavItem {
   path: string;
   label: string;
   icon: React.ReactNode;
-  adminOnly?: boolean;
+  minimumRole?: string;
 }
 
 const navItems: NavItem[] = [
   { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
   { path: '/documents', label: 'Documents', icon: <FileText size={20} /> },
   { path: '/batches', label: 'Batches', icon: <FolderOpen size={20} /> },
-  { path: '/stores', label: 'Stores', icon: <Store size={20} />, adminOnly: true },
-  { path: '/settings', label: 'Settings', icon: <Settings size={20} />, adminOnly: true },
+  { path: '/stores', label: 'Stores', icon: <Store size={20} />, minimumRole: 'manager' },
+  { path: '/settings', label: 'Settings', icon: <Settings size={20} />, minimumRole: 'admin' },
 ];
 
 interface LayoutProps {
@@ -29,6 +31,11 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
+  const { user, logout, checkMinimumRole } = useAuth();
+
+  const visibleNavItems = navItems.filter(
+    (item) => !item.minimumRole || checkMinimumRole(item.minimumRole)
+  );
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -47,7 +54,7 @@ export function Layout({ children }: LayoutProps) {
 
         <nav className="flex-1 p-3">
           <ul className="space-y-0.5">
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
                 <li key={item.path}>
@@ -73,10 +80,19 @@ export function Layout({ children }: LayoutProps) {
             <div className="w-7 h-7 bg-gray-200 rounded-full flex items-center justify-center">
               <User size={14} className="text-gray-500" />
             </div>
-            <div className="text-xs">
-              <div className="font-medium text-gray-700">Admin User</div>
-              <div className="text-gray-400">admin@slumberland.com</div>
+            <div className="flex-1 text-xs">
+              <div className="font-medium text-gray-700">
+                {user ? `${user.firstName} ${user.lastName}` : 'User'}
+              </div>
+              <div className="text-gray-400">{user?.email}</div>
             </div>
+            <button
+              onClick={logout}
+              className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+              title="Sign out"
+            >
+              <LogOut size={14} />
+            </button>
           </div>
         </div>
       </aside>

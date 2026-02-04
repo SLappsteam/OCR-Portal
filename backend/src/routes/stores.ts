@@ -1,12 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import { z } from 'zod';
 import { ApiResponse } from '../types';
 import { BadRequestError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
+import { requireMinimumRole } from '../middleware/authorize';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const createSchema = z.object({
   storeNumber: z.string().min(1).max(20),
@@ -29,7 +29,7 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requireMinimumRole('manager'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = createSchema.safeParse(req.body);
     if (!parsed.success) {

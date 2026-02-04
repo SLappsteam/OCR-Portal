@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { getTiffMetadata, extractPageAsPng } from '../services/tiffService';
 import { detectBarcode, normalizeBarcode } from '../services/barcodeService';
 import { analyzeTiff } from '../services/documentSplitter';
-import { processBatch, getBatchStatus } from '../services/batchProcessor';
+import { processTiffScan, getBatchStatus } from '../services/batchProcessor';
 import { ApiResponse } from '../types';
 import { logger } from '../utils/logger';
 import { BadRequestError } from '../middleware/errorHandler';
@@ -60,7 +60,7 @@ router.post(
       const { batchId } = parsed.data;
       logger.info(`Test: Processing batch ${batchId}`);
 
-      await processBatch(batchId);
+      await processTiffScan(batchId);
       const status = await getBatchStatus(batchId);
 
       const response: ApiResponse = {

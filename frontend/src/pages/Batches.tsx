@@ -25,12 +25,14 @@ interface BatchRow {
   id: number;
   reference: string | null;
   file_name: string;
+  batch_type: string | null;
+  parent_batch_id: number | null;
   status: string;
   page_count: number | null;
   created_at: string;
   error_message: string | null;
   store: { store_number: string };
-  _count: { documents: number };
+  _count: { documents: number; childBatches: number };
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -136,6 +138,15 @@ export function Batches() {
         cell: ({ row }) => (
           <span className="font-mono text-sm">
             {row.original.reference ?? '-'}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'batch_type',
+        header: 'Type',
+        cell: ({ row }) => (
+          <span className="text-sm">
+            {row.original.batch_type ?? '-'}
           </span>
         ),
       },
@@ -331,11 +342,6 @@ export function Batches() {
                         )}
                         <BatchDetailsPanel
                           batchId={row.original.id}
-                          stores={stores}
-                          onStoreChanged={() => {
-                            loadBatches();
-                            loadStores();
-                          }}
                         />
                       </td>
                     </tr>

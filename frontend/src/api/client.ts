@@ -1,8 +1,22 @@
 import type { ApiResponse } from '../types';
 import type { PageExtractionRecord, PageSearchResult } from '../types/extraction';
 import type { FieldFilter } from '../types/filters';
-
 const API_BASE_URL = import.meta.env['VITE_API_URL'] ?? '/api';
+
+let accessToken: string | null = null;
+let refreshHandler: (() => Promise<boolean>) | null = null;
+
+export function setAccessToken(token: string | null): void {
+  accessToken = token;
+}
+
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+
+export function setRefreshHandler(handler: () => Promise<boolean>): void {
+  refreshHandler = handler;
+}
 
 export interface HealthCheckResponse {
   status: 'ok' | 'degraded' | 'error';
@@ -33,20 +47,33 @@ class ApiClient {
     this.baseUrl = baseUrl;
   }
 
+  private buildConfig(options: RequestInit): RequestInit {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string>),
+    };
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+    return { ...options, headers, credentials: 'include' };
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-    const config: RequestInit = {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    };
+    const config = this.buildConfig(options);
 
-    const response = await fetch(url, config);
+    let response = await fetch(url, config);
+
+    if (response.status === 401 && accessToken && refreshHandler) {
+      const refreshed = await refreshHandler();
+      if (refreshed) {
+        const retryConfig = this.buildConfig(options);
+        response = await fetch(url, retryConfig);
+      }
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -263,3 +290,4 @@ export function getThumbnailUrl(documentId: number): string {
 export function getBatchPreviewUrl(batchId: number, pageNumber: number): string {
   return `${API_BASE_URL}/api/preview/batch/${batchId}/${pageNumber}`;
 }
+

@@ -1,10 +1,9 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import { analyzeTiff, type BatchSection, type AnalyzeResult } from './documentSplitter';
 import { createPageDocument } from './batchCreator';
 import { classifyPageContent } from './cdrScanner';
 import { logger } from '../utils/logger';
-
-const prisma = new PrismaClient();
 
 type BatchStatus = 'pending' | 'processing' | 'completed' | 'failed';
 

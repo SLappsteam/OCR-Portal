@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -92,6 +93,20 @@ async function main(): Promise<void> {
     });
     console.log(`Upserted document type: ${docType.code}`);
   }
+
+  const adminPasswordHash = await bcrypt.hash('ChangeMe123!', 12);
+  await prisma.user.upsert({
+    where: { email: 'admin@slumberland.com' },
+    update: { password_hash: adminPasswordHash, role: 'admin' },
+    create: {
+      email: 'admin@slumberland.com',
+      password_hash: adminPasswordHash,
+      first_name: 'Admin',
+      last_name: 'User',
+      role: 'admin',
+    },
+  });
+  console.log('Upserted admin user: admin@slumberland.com');
 
   console.log('Seeding completed.');
 }

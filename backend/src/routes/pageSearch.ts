@@ -1,11 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import { z } from 'zod';
 import { ApiResponse } from '../types';
 import { BadRequestError } from '../middleware/errorHandler';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const querySchema = z.object({
   search: z.string().min(1),

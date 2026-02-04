@@ -1,9 +1,7 @@
 import sharp from 'sharp';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import { logger } from '../utils/logger';
 import { ocrRecognize } from './ocrPool';
-
-const prisma = new PrismaClient();
 
 const CODE_39_WRAPPER = /^\*|\*$/g;
 const OCR_NOISE_CHARS = /[^A-Z0-9]/g;

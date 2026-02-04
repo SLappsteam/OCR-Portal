@@ -2,19 +2,38 @@ import chokidar, { FSWatcher } from 'chokidar';
 import path from 'path';
 import { stat } from 'fs/promises';
 import sharp from 'sharp';
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import { logger } from '../utils/logger';
 import { calculateFileHash, parseLocationInfo, LocationInfo } from '../utils/fileUtils';
 import { storeFile, archiveFile } from './storageService';
-import { processBatch } from './batchProcessor';
+import { processTiffScan } from './batchProcessor';
 import { setWatcherStatus } from '../routes/settings';
-
-const prisma = new PrismaClient();
 const MAX_REFERENCE_RETRIES = 10;
+const MAX_CONCURRENT_BATCHES = parseInt(process.env['MAX_CONCURRENT_BATCHES'] ?? '4', 10);
 
 let watcher: FSWatcher | null = null;
 const DEBOUNCE_MS = 2000;
 const processingFiles = new Set<string>();
+let activeBatches = 0;
+const batchQueue: Array<() => void> = [];
+
+function acquireBatchSlot(): Promise<void> {
+  if (activeBatches < MAX_CONCURRENT_BATCHES) {
+    activeBatches++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => batchQueue.push(resolve));
+}
+
+function releaseBatchSlot(): void {
+  const next = batchQueue.shift();
+  if (next) {
+    next();
+  } else {
+    activeBatches--;
+  }
+}
 
 async function isValidTiff(filePath: string): Promise<boolean> {
   try {
@@ -26,8 +45,8 @@ async function isValidTiff(filePath: string): Promise<boolean> {
 }
 
 async function isDuplicateFile(fileHash: string): Promise<boolean> {
-  const existing = await prisma.batch.findUnique({
-    where: { file_hash: fileHash },
+  const existing = await prisma.batch.findFirst({
+    where: { file_hash: fileHash, parent_batch_id: null },
   });
   return existing !== null;
 }
@@ -119,11 +138,6 @@ async function createBatchWithRetry(
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        const target = error.meta?.['target'] as string[] | undefined;
-        if (target?.includes('file_hash')) {
-          logger.warn(`Duplicate file detected for ${filename} (hash: ${fileHash.substring(0, 16)})`);
-          return null;
-        }
         logger.warn(`Reference collision on ${reference}, retrying (${attempt + 1}/${MAX_REFERENCE_RETRIES})...`);
         continue;
       }
@@ -199,10 +213,15 @@ async function processNewFile(filePath: string): Promise<void> {
 
     logger.info(`  Created batch ${batch.id} (ref=${storageFolder}) for ${locationInfo?.displayName ?? 'UNASSIGNED'}`);
 
-    setImmediate(() => {
-      processBatch(batch.id).catch((err) => {
+    setImmediate(async () => {
+      await acquireBatchSlot();
+      try {
+        await processTiffScan(batch.id);
+      } catch (err) {
         logger.error(`Background processing failed for batch ${batch.id}:`, err);
-      });
+      } finally {
+        releaseBatchSlot();
+      }
     });
 
     try {

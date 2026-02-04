@@ -1,25 +1,54 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Documents } from './pages/Documents';
-import { DocumentViewer } from './pages/DocumentViewer';
 import { Batches } from './pages/Batches';
+import { BatchViewer } from './pages/BatchViewer';
 import { Stores } from './pages/Stores';
 import { Settings } from './pages/Settings';
+import { Login } from './pages/Login';
 
 function App() {
   return (
     <BrowserRouter>
-      <Layout>
+      <AuthProvider>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/documents" element={<Documents />} />
-          <Route path="/documents/:id" element={<DocumentViewer />} />
-          <Route path="/batches" element={<Batches />} />
-          <Route path="/stores" element={<Stores />} />
-          <Route path="/settings" element={<Settings />} />
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/documents" element={<Documents />} />
+                    <Route path="/batches" element={<Batches />} />
+                    <Route path="/batches/:id" element={<BatchViewer />} />
+                    <Route
+                      path="/stores"
+                      element={
+                        <ProtectedRoute minimumRole="manager">
+                          <Stores />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/settings"
+                      element={
+                        <ProtectedRoute minimumRole="admin">
+                          <Settings />
+                        </ProtectedRoute>
+                      }
+                    />
+                  </Routes>
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
         </Routes>
-      </Layout>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

@@ -1,12 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import { z } from 'zod';
 import { ApiResponse } from '../types';
 import { BadRequestError, NotFoundError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
+import { requireMinimumRole } from '../middleware/authorize';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 function serializeDocument(doc: Record<string, unknown>): Record<string, unknown> {
   return JSON.parse(
@@ -142,6 +142,7 @@ router.get('/:id/extractions', async (req: Request, res: Response, next: NextFun
 
 router.patch(
   '/:id',
+  requireMinimumRole('operator'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = parseInt(req.params['id'] ?? '', 10);

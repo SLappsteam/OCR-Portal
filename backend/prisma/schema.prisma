@@ -118,10 +118,25 @@ model User {
   updated_at       DateTime          @updatedAt
   batches          Batch[]
   storeAccess      UserStoreAccess[]
+  refreshTokens    RefreshToken[]
 
   @@index([email])
   @@index([role])
   @@map("users")
+}
+
+model RefreshToken {
+  id          Int       @id @default(autoincrement())
+  token_hash  String    @unique
+  user_id     Int
+  expires_at  DateTime
+  revoked_at  DateTime?
+  created_at  DateTime  @default(now())
+  user        User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
+  @@map("refresh_tokens")
 }
 
 model UserStoreAccess {

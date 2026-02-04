@@ -1,12 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import { clearStorageFiles } from '../services/storageService';
 import { ApiResponse } from '../types';
 import { logger } from '../utils/logger';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 interface SettingsResponse {
   watchFolderPath: string;

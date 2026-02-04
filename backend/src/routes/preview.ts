@@ -1,12 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import sharp from 'sharp';
 import { extractPageAsPng } from '../services/tiffService';
 import { BadRequestError, NotFoundError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const THUMBNAIL_WIDTH = 300;
 const CACHE_MAX_AGE = 300;
@@ -25,6 +24,39 @@ async function getDocumentWithBatch(documentId: number) {
 }
 
 router.get(
+  '/batch/:batchId/:pageNumber',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const batchId = parseInt(req.params['batchId'] ?? '', 10);
+      const pageNumber = parseInt(req.params['pageNumber'] ?? '', 10);
+
+      if (isNaN(batchId) || isNaN(pageNumber) || pageNumber < 0) {
+        throw new BadRequestError('Invalid batch ID or page number');
+      }
+
+      const batch = await prisma.batch.findUnique({ where: { id: batchId } });
+      if (!batch) {
+        throw new NotFoundError('Batch not found');
+      }
+
+      if (batch.page_count !== null && pageNumber >= batch.page_count) {
+        throw new BadRequestError(`Page ${pageNumber} exceeds batch page count (${batch.page_count})`);
+      }
+
+      const imageBuffer = await extractPageAsPng(batch.file_path, pageNumber);
+
+      res.set({
+        'Content-Type': 'image/png',
+        'Cache-Control': `private, max-age=${CACHE_MAX_AGE}`,
+      });
+      res.send(imageBuffer);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.get(
   '/:documentId/:pageNumber',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -37,15 +69,9 @@ router.get(
 
       const document = await getDocumentWithBatch(documentId);
 
-      if (pageNumber < document.page_start || pageNumber > document.page_end) {
-        throw new BadRequestError(
-          `Page ${pageNumber} is outside document range (${document.page_start}-${document.page_end})`
-        );
-      }
-
       const imageBuffer = await extractPageAsPng(
         document.batch.file_path,
-        pageNumber
+        document.page_number
       );
 
       res.set({
@@ -72,7 +98,7 @@ router.get(
       const document = await getDocumentWithBatch(documentId);
       const imageBuffer = await extractPageAsPng(
         document.batch.file_path,
-        document.page_start
+        document.page_number
       );
 
       const thumbnail = await sharp(imageBuffer)

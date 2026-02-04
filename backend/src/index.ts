@@ -8,10 +8,15 @@ import { errorHandler } from './middleware/errorHandler';
 import { routes } from './routes';
 import { startWatcher, stopWatcher } from './services/watcherService';
 import { ensureStorageDirectories } from './services/storageService';
+import { recoverStuckBatches } from './services/batchRecovery';
 import { acquireLock, releaseLock } from './utils/processLock';
 import { shutdownOcrPool } from './services/ocrPool';
+import { disconnectPrisma } from './utils/prisma';
+import { validateAuthEnvironment } from './utils/authConstants';
+import cookieParser from 'cookie-parser';
 
 dotenv.config();
+validateAuthEnvironment();
 
 acquireLock();
 
@@ -22,7 +27,11 @@ const WATCH_FOLDER_PATH = process.env['WATCH_FOLDER_PATH'] ?? './watch';
 let server: Server | null = null;
 
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: process.env['FRONTEND_URL'] ?? 'http://localhost:5173',
+  credentials: true,
+}));
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -32,6 +41,7 @@ app.use(errorHandler);
 
 async function startup(): Promise<void> {
   await ensureStorageDirectories();
+  await recoverStuckBatches();
   startWatcher(WATCH_FOLDER_PATH);
 }
 
@@ -40,6 +50,7 @@ async function shutdown(): Promise<void> {
   releaseLock();
   stopWatcher();
   await shutdownOcrPool();
+  await disconnectPrisma();
 
   if (server) {
     server.close(() => {

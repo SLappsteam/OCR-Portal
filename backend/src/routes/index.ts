@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import healthRouter from './health';
+import authRouter from './auth';
 import testProcessRouter from './testProcess';
 import documentsRouter from './documents';
 import batchesRouter from './batches';
@@ -9,18 +10,22 @@ import documentTypesRouter from './documentTypes';
 import statsRouter from './stats';
 import settingsRouter from './settings';
 import pageSearchRouter from './pageSearch';
+import { authenticate } from '../middleware/authenticate';
+import { requireRole } from '../middleware/authorize';
 
 const router = Router();
 
 router.use('/health', healthRouter);
-router.use('/api/test', testProcessRouter);
-router.use('/api/documents', documentsRouter);
-router.use('/api/page-search', pageSearchRouter);
-router.use('/api/batches', batchesRouter);
-router.use('/api/preview', previewRouter);
-router.use('/api/stores', storesRouter);
-router.use('/api/document-types', documentTypesRouter);
-router.use('/api/stats', statsRouter);
-router.use('/api/settings', settingsRouter);
+router.use('/api/auth', authRouter);
+
+router.use('/api/test', authenticate, requireRole('admin'), testProcessRouter);
+router.use('/api/documents', authenticate, documentsRouter);
+router.use('/api/page-search', authenticate, pageSearchRouter);
+router.use('/api/batches', authenticate, batchesRouter);
+router.use('/api/preview', authenticate, previewRouter);
+router.use('/api/stores', authenticate, storesRouter);
+router.use('/api/document-types', authenticate, documentTypesRouter);
+router.use('/api/stats', authenticate, statsRouter);
+router.use('/api/settings', authenticate, requireRole('admin'), settingsRouter);
 
 export { router as routes };

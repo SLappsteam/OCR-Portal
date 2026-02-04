@@ -1,8 +1,7 @@
-import { PrismaClient, Store } from '@prisma/client';
+import { Store } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import { StoreDto } from '../types';
 import { NotFoundError } from '../middleware/errorHandler';
-
-const prisma = new PrismaClient();
 
 function toStoreDto(store: Store): StoreDto {
   return {
