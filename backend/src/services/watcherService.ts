@@ -156,6 +156,8 @@ async function processNewFile(filePath: string): Promise<void> {
   }
   processingFiles.add(filePath);
 
+  let handedOffToBackground = false;
+
   try {
     logger.info(`Incoming file: ${filename}`);
 
@@ -202,7 +204,6 @@ async function processNewFile(filePath: string): Promise<void> {
     );
 
     if (!batch) {
-      // Duplicate detected during batch creation - just archive the file
       try {
         await archiveFile(filePath);
       } catch {
@@ -213,26 +214,35 @@ async function processNewFile(filePath: string): Promise<void> {
 
     logger.info(`  Created batch ${batch.id} (ref=${storageFolder}) for ${locationInfo?.displayName ?? 'UNASSIGNED'}`);
 
-    setImmediate(async () => {
-      await acquireBatchSlot();
-      try {
-        await processTiffScan(batch.id);
-      } catch (err) {
-        logger.error(`Background processing failed for batch ${batch.id}:`, err);
-      } finally {
-        releaseBatchSlot();
-      }
-    });
-
     try {
       await archiveFile(filePath);
     } catch (archiveError) {
       logger.warn(`Failed to archive ${filename}, but batch ${batch.id} will still be processed:`, archiveError);
     }
+
+    handedOffToBackground = true;
+    setImmediate(async () => {
+      try {
+        await acquireBatchSlot();
+        try {
+          await processTiffScan(batch.id);
+        } catch (err) {
+          logger.error(`Background processing failed for batch ${batch.id}:`, err);
+        } finally {
+          releaseBatchSlot();
+        }
+      } catch (slotErr) {
+        logger.error(`Failed to acquire batch slot for batch ${batch.id}:`, slotErr);
+      } finally {
+        processingFiles.delete(filePath);
+      }
+    });
   } catch (error) {
     logger.error(`Error processing file ${filename}:`, error);
   } finally {
-    processingFiles.delete(filePath);
+    if (!handedOffToBackground) {
+      processingFiles.delete(filePath);
+    }
   }
 }
 
