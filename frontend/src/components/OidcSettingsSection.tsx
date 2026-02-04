@@ -25,6 +25,7 @@ export function OidcSettingsSection() {
   const [enabled, setEnabled] = useState(false);
   const [tenantId, setTenantId] = useState('');
   const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
 
   useEffect(() => {
     apiClient
@@ -45,11 +46,17 @@ export function OidcSettingsSection() {
     setIsSaving(true);
     setMessage(null);
     try {
+      const payload: Record<string, unknown> = { enabled, tenantId, clientId };
+      if (clientSecret) {
+        payload['clientSecret'] = clientSecret;
+      }
       const response = await apiClient.patch<ApiResponse>(
         '/api/settings/oidc',
-        { enabled, tenantId, clientId }
+        payload
       );
       if (response.success) {
+        setClientSecret('');
+        setOidc((prev) => prev ? { ...prev, hasClientSecret: prev.hasClientSecret || Boolean(clientSecret) } : prev);
         setMessage('OIDC settings saved');
       } else {
         setMessage(response.error ?? 'Failed to save');
@@ -141,17 +148,31 @@ export function OidcSettingsSection() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-600">Client Secret (env var):</span>
-            <span
-              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                oidc?.hasClientSecret
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-yellow-100 text-yellow-800'
-              }`}
-            >
-              {oidc?.hasClientSecret ? 'Set' : 'Not Set'}
-            </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Client Secret
+              </label>
+              <span
+                className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                  oidc?.hasClientSecret
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}
+              >
+                {oidc?.hasClientSecret ? 'Configured' : 'Not Set'}
+              </span>
+            </div>
+            <input
+              type="password"
+              value={clientSecret}
+              onChange={(e) => setClientSecret(e.target.value)}
+              placeholder={oidc?.hasClientSecret ? 'Leave blank to keep current' : 'Paste client secret from Azure'}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Encrypted at rest. Never displayed after saving.
+            </p>
           </div>
 
           <div className="bg-blue-50 rounded p-3 text-xs text-blue-700">

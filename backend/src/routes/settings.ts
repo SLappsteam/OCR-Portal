@@ -6,6 +6,8 @@ import { clearStorageFiles } from '../services/storageService';
 import { ApiResponse } from '../types';
 import { logger } from '../utils/logger';
 import { BadRequestError } from '../middleware/errorHandler';
+import { hasClientSecret } from '../services/oidcService';
+import { encryptSecret } from '../utils/oidcCrypto';
 
 const router = Router();
 
@@ -81,6 +83,7 @@ router.get('/oidc', async (_req: Request, res: Response, next: NextFunction) => 
     });
 
     const settingsMap = new Map(rows.map((r) => [r.key, r.value]));
+    const secretConfigured = await hasClientSecret();
 
     res.json({
       success: true,
@@ -88,7 +91,7 @@ router.get('/oidc', async (_req: Request, res: Response, next: NextFunction) => 
         enabled: settingsMap.get('oidc_enabled') === 'true',
         tenantId: settingsMap.get('oidc_tenant_id') ?? '',
         clientId: settingsMap.get('oidc_client_id') ?? '',
-        hasClientSecret: Boolean(process.env['ENTRA_CLIENT_SECRET']),
+        hasClientSecret: secretConfigured,
       },
     });
   } catch (error) {
@@ -100,6 +103,7 @@ const oidcUpdateSchema = z.object({
   enabled: z.boolean(),
   tenantId: z.string(),
   clientId: z.string(),
+  clientSecret: z.string().optional(),
 });
 
 router.patch('/oidc', async (req: Request, res: Response, next: NextFunction) => {
@@ -109,7 +113,7 @@ router.patch('/oidc', async (req: Request, res: Response, next: NextFunction) =>
       throw new BadRequestError('Invalid OIDC settings');
     }
 
-    const { enabled, tenantId, clientId } = parsed.data;
+    const { enabled, tenantId, clientId, clientSecret } = parsed.data;
 
     if (enabled) {
       if (!GUID_REGEX.test(tenantId)) {
@@ -118,14 +122,15 @@ router.patch('/oidc', async (req: Request, res: Response, next: NextFunction) =>
       if (!GUID_REGEX.test(clientId)) {
         throw new BadRequestError('Client ID must be a valid GUID');
       }
-      if (!process.env['ENTRA_CLIENT_SECRET']) {
+      const willHaveSecret = clientSecret || (await hasClientSecret());
+      if (!willHaveSecret) {
         throw new BadRequestError(
-          'ENTRA_CLIENT_SECRET environment variable must be set to enable OIDC'
+          'A client secret is required to enable OIDC'
         );
       }
     }
 
-    await prisma.$transaction([
+    const upserts = [
       prisma.appSetting.upsert({
         where: { key: 'oidc_enabled' },
         update: { value: String(enabled) },
@@ -141,7 +146,20 @@ router.patch('/oidc', async (req: Request, res: Response, next: NextFunction) =>
         update: { value: clientId },
         create: { key: 'oidc_client_id', value: clientId },
       }),
-    ]);
+    ];
+
+    if (clientSecret) {
+      const encrypted = encryptSecret(clientSecret);
+      upserts.push(
+        prisma.appSetting.upsert({
+          where: { key: 'oidc_client_secret_enc' },
+          update: { value: encrypted },
+          create: { key: 'oidc_client_secret_enc', value: encrypted },
+        })
+      );
+    }
+
+    await prisma.$transaction(upserts);
 
     logger.info(`OIDC settings updated: enabled=${enabled}`);
     res.json({ success: true, data: { enabled, tenantId, clientId } });

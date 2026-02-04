@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { prisma } from '../utils/prisma';
 import { logger } from '../utils/logger';
+import { decryptSecret } from '../utils/oidcCrypto';
 
 interface OidcConfig {
   tenantId: string;
@@ -32,20 +33,39 @@ interface GraphMeResponse {
 }
 
 export async function getOidcConfig(): Promise<OidcConfig> {
-  const [tenantRow, clientRow] = await Promise.all([
+  const [tenantRow, clientRow, secretRow] = await Promise.all([
     prisma.appSetting.findUnique({ where: { key: 'oidc_tenant_id' } }),
     prisma.appSetting.findUnique({ where: { key: 'oidc_client_id' } }),
+    prisma.appSetting.findUnique({ where: { key: 'oidc_client_secret_enc' } }),
   ]);
 
   const tenantId = tenantRow?.value;
   const clientId = clientRow?.value;
-  const clientSecret = process.env['ENTRA_CLIENT_SECRET'];
+  const clientSecret = resolveClientSecret(secretRow?.value);
 
   if (!tenantId || !clientId || !clientSecret) {
     throw new Error('OIDC configuration is incomplete');
   }
 
   return { tenantId, clientId, clientSecret };
+}
+
+function resolveClientSecret(encryptedDbValue: string | undefined): string | undefined {
+  if (encryptedDbValue) {
+    try {
+      return decryptSecret(encryptedDbValue);
+    } catch {
+      logger.warn('Failed to decrypt stored client secret, falling back to env var');
+    }
+  }
+  return process.env['ENTRA_CLIENT_SECRET'];
+}
+
+export async function hasClientSecret(): Promise<boolean> {
+  const secretRow = await prisma.appSetting.findUnique({
+    where: { key: 'oidc_client_secret_enc' },
+  });
+  return Boolean(secretRow?.value) || Boolean(process.env['ENTRA_CLIENT_SECRET']);
 }
 
 export async function isOidcEnabled(): Promise<boolean> {
