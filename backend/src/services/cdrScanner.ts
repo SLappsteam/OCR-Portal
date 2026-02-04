@@ -5,6 +5,12 @@ import { correctPageImage } from './imageCorrection';
 import { ocrRecognize } from './ocrPool';
 import { isTicketPage, parseTicketText, calculateTicketConfidence } from './extraction/ticketParser';
 import { parseFinsalesPage, calculateConfidence } from './extraction/finsalesParser';
+import { isCdrReport, parseCdrReport, calculateCdrConfidence } from './extraction/cdrReportParser';
+import {
+  isTransactionReceipt,
+  parseTransactionReceipt,
+  calculateReceiptConfidence,
+} from './extraction/transactionReceiptParser';
 import { scanBarcodeInRegion, getDocumentTypeByCode } from './barcodeService';
 import { parseManifestOrders } from './manifestDetector';
 import { logger } from '../utils/logger';
@@ -108,6 +114,28 @@ async function ocrAndParse(
         };
       }
     }
+  }
+
+  // Check for Cash Drawer Report pages
+  if (isCdrReport(text)) {
+    const cdrFields = parseCdrReport(text);
+    return {
+      fields: cdrFields,
+      raw_text: text,
+      confidence: calculateCdrConfidence(cdrFields),
+      documentType: 'CDR_REPORT',
+    };
+  }
+
+  // Check for Transaction Receipt pages
+  if (isTransactionReceipt(text)) {
+    const receiptFields = parseTransactionReceipt(text);
+    return {
+      fields: receiptFields,
+      raw_text: text,
+      confidence: calculateReceiptConfidence(receiptFields),
+      documentType: 'RECEIPT',
+    };
   }
 
   // Check if content matches invoice patterns (sales tickets, financing docs)

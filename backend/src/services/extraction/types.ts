@@ -22,6 +22,22 @@ export interface FinsalesData {
   financed_amount: string | null;
 }
 
+export interface CdrReportData {
+  cash_drawers: number[];
+  grand_total: string | null;
+  total_refund: string | null;
+  trans_count: number | null;
+  order_ids: string[];
+  payment_site: string | null;
+  post_date: string | null;
+}
+
+export interface ReceiptTransaction {
+  date: string | null;
+  payment_type: string | null;
+  amount: string | null;
+}
+
 export interface ExtractionResult {
   document_type: string;
   fields: FinsalesData;

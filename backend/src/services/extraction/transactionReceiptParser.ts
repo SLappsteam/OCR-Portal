@@ -1,24 +1,39 @@
-import { FinsalesData } from './types';
+import { FinsalesData, ReceiptTransaction } from './types';
 
 const RECEIPT_PATTERN = /Transaction\s+Receipt/i;
 const CUSTOMER_ID_PATTERN = /Customer\s+ID[;:]\s*(\S+)/i;
 const SALES_ORDER_PATTERN = /Sales\s+Order[;:]\s*(\S+)/i;
 const CASHIER_PATTERN = /Cashier[;:]\s*(\S+)/i;
 const PRINTED_ON_PATTERN = /Printed\s+on[;:]\s*([\d/]+)/i;
-const EMAIL_PATTERN = /Email[;:]\s*(\S+@\S+)/i;
 const PHONE_PATTERN = /(?:Home|Phone)[;:]\s*(\(?\d{3}\)?\s*[-.]?\s*\d{3}\s*[-.]?\s*\d{4})/gi;
 const CITY_STATE_ZIP_PATTERN = /^([A-Z][A-Za-z\s]+,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?)$/;
-const AMOUNT_PATTERN = /(-?)\$\s*([\d,.]+)/g;
 const STORE_SUFFIX_PATTERN = /\s+[-–]\s*\d{2}$|\s+Store\s+\d+$/i;
+const TXN_HEADER_PATTERN = /Date\s+Ty/i;
+const TXN_END_PATTERN = /Cashier|Customer:|SIGNATURE/i;
+const DATE_PATTERN = /\b(\d{1,2}\/\d{2}\/\d{4})\b/;
+// Only strip [...] and {...} noise (NOT parens — "(refund)" is real content)
+const BRACKET_NOISE = /[\[{][^\]}]*[\]}]/g;
+
+const PAYMENT_KEYWORDS: [RegExp, string][] = [
+  [/Podium/i, 'Podium'],
+  [/Master\s*Card/i, 'Master Card'],
+  [/VISA\s*CARDS?/i, 'VISA'],
+  [/American\s*Express|Amex/i, 'American Express'],
+  [/\bExpress\b/i, 'American Express'],
+  [/Discover/i, 'Discover'],
+  [/Check/i, 'Check'],
+  [/\bCash\b/i, 'Cash'],
+  [/Debit/i, 'Debit'],
+];
 
 export function isTransactionReceipt(rawText: string): boolean {
   return RECEIPT_PATTERN.test(rawText);
 }
 
-export function parseTransactionReceipt(rawText: string): FinsalesData {
+export function parseTransactionReceipt(
+  rawText: string
+): FinsalesData & { transactions: ReceiptTransaction[] } {
   const { name, address, cityStateZip } = extractCustomerBlock(rawText);
-  const amounts = extractAmounts(rawText);
-  const totalAmount = calculateTotal(amounts);
 
   return {
     fulfillment: 'RECEIPT',
@@ -35,25 +50,28 @@ export function parseTransactionReceipt(rawText: string): FinsalesData {
     delivery_date: extractField(rawText, PRINTED_ON_PATTERN),
     salesperson: extractField(rawText, CASHIER_PATTERN),
     truck_id: null,
-    total_sale: totalAmount,
+    total_sale: null,
     stat: null,
     stop: null,
     zone: null,
     customer_code: null,
     finance_company: null,
     financed_amount: null,
+    transactions: extractTransactions(rawText),
   };
 }
 
-export function calculateReceiptConfidence(fields: FinsalesData): number {
+export function calculateReceiptConfidence(
+  fields: FinsalesData & { transactions?: ReceiptTransaction[] }
+): number {
   const keyFields = [
-    fields.customer_name,
-    fields.customer_id,
     fields.order_id,
-    fields.total_sale,
+    fields.customer_name,
+    fields.delivery_date,
   ];
   const populated = keyFields.filter((v) => v !== null).length;
-  return populated / keyFields.length;
+  const hasTxns = (fields.transactions?.length ?? 0) > 0 ? 1 : 0;
+  return (populated + hasTxns) / (keyFields.length + 1);
 }
 
 function extractField(text: string, pattern: RegExp): string | null {
@@ -76,10 +94,15 @@ function extractCustomerBlock(text: string): {
 
   const addressLine = lines[receiptIdx + 2]?.trim() ?? '';
   const addressPart = addressLine.split(/\s{3,}/)[0]?.trim() ?? '';
-  const address = addressPart.replace(STORE_SUFFIX_PATTERN, '').trim().toUpperCase() || null;
+  const address =
+    addressPart.replace(STORE_SUFFIX_PATTERN, '').trim().toUpperCase() || null;
 
   let cityStateZip: string | null = null;
-  for (let i = receiptIdx + 3; i < Math.min(receiptIdx + 6, lines.length); i++) {
+  for (
+    let i = receiptIdx + 3;
+    i < Math.min(receiptIdx + 6, lines.length);
+    i++
+  ) {
     const line = lines[i]?.trim() ?? '';
     if (CITY_STATE_ZIP_PATTERN.test(line)) {
       cityStateZip = line.toUpperCase();
@@ -97,19 +120,95 @@ function extractPhones(text: string): string | null {
   return unique.length > 0 ? unique.join(', ') : null;
 }
 
-function extractAmounts(text: string): number[] {
-  const matches = [...text.matchAll(AMOUNT_PATTERN)];
-  return matches
-    .map((m) => {
-      const sign = m[1] === '-' ? -1 : 1;
-      const raw = m[2]?.replace(/,/g, '') ?? '';
-      return sign * parseFloat(raw);
-    })
-    .filter((n) => !isNaN(n));
+function getTransactionBlock(rawText: string): string[] | null {
+  const lines = rawText.split('\n');
+  const headerIdx = lines.findIndex((l) => TXN_HEADER_PATTERN.test(l));
+  if (headerIdx < 0) return null;
+
+  const endIdx = lines.findIndex(
+    (l, i) => i > headerIdx && TXN_END_PATTERN.test(l)
+  );
+  const end = endIdx > headerIdx ? endIdx : lines.length;
+  return lines.slice(headerIdx + 1, end);
 }
 
-function calculateTotal(amounts: number[]): string | null {
-  if (amounts.length === 0) return null;
-  const total = amounts.reduce((sum, n) => sum + n, 0);
-  return total.toFixed(2);
+function findPrevNonEmpty(lines: string[], fromIdx: number): string {
+  for (let j = fromIdx - 1; j >= Math.max(0, fromIdx - 3); j--) {
+    if (lines[j]!.trim()) return lines[j]!;
+  }
+  return '';
+}
+
+function extractTransactions(rawText: string): ReceiptTransaction[] {
+  const blockLines = getTransactionBlock(rawText);
+  if (!blockLines) return [];
+
+  const transactions: ReceiptTransaction[] = [];
+
+  for (let i = 0; i < blockLines.length; i++) {
+    const dateMatch = blockLines[i]!.match(DATE_PATTERN);
+    if (!dateMatch) continue;
+
+    // Look back up to 3 lines for the type prefix (skip empty lines)
+    const prevLine = findPrevNonEmpty(blockLines, i);
+    const currLine = blockLines[i]!;
+    const nextLine = i < blockLines.length - 1 ? blockLines[i + 1]! : '';
+
+    // Base keyword from prev+current only (avoid adjacent txn bleed)
+    // Modifiers (LOFT, refund) from all 3 lines
+    const typeLines = [prevLine, currLine];
+    const modifierLines = [prevLine, currLine, nextLine];
+
+    transactions.push({
+      date: dateMatch[1]!,
+      payment_type: detectPaymentType(typeLines, modifierLines),
+      amount: extractTransactionAmount(currLine),
+    });
+  }
+
+  return transactions;
+}
+
+function cleanLines(lines: string[]): string {
+  return lines.map((l) => l.replace(BRACKET_NOISE, ' ')).join(' ');
+}
+
+function detectPaymentType(
+  typeLines: string[],
+  modifierLines: string[]
+): string | null {
+  // Clean brackets per-line to avoid cross-line bracket spans eating content
+  const cleanedType = cleanLines(typeLines);
+  const cleanedMod = cleanLines(modifierLines);
+
+  let base: string | null = null;
+  for (const [pattern, name] of PAYMENT_KEYWORDS) {
+    if (pattern.test(cleanedType)) {
+      base = name;
+      break;
+    }
+  }
+  if (!base) return null;
+
+  if (/LOFT/i.test(cleanedMod)) {
+    base += ' - LOFT';
+  }
+
+  if (/refund/i.test(cleanedMod)) {
+    base += ' (refund)';
+  }
+
+  return base;
+}
+
+function extractTransactionAmount(line: string): string | null {
+  // Try negative first: handles -, ~, « as negative signs (OCR variants)
+  const negative = line.match(/[-~«]\s*\$\s*([\d,]+\.\d{2})/);
+  if (negative) return `-$${negative[1]}`;
+
+  // Positive amount
+  const positive = line.match(/\$\s*([\d,]+\.\d{2})/);
+  if (positive) return `$${positive[1]}`;
+
+  return null;
 }

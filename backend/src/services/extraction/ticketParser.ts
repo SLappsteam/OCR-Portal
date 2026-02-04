@@ -10,8 +10,8 @@ const TRUCK_ID_PATTERN = /Truck\s+ID:\s*(.+)/i;
 const SUBTOTAL_PATTERN = /Subtotal:?\s*\$?\s*([\d,.]+)/i;
 const SHIPPING_ZONE_PATTERN = /Shipping\s+Zone:\s*(\S+)/i;
 const STOP_PATTERN = /Stop:\s*(\d+)/i;
-const MOBILE_PATTERN = /Mobile:\s*(\(?\d{3}\)?\s*[-.]?\s*\d{3}\s*[-.]?\s*\d{4})/g;
-const SECONDARY_PHONE_PATTERN = /Secondary\s+Phone:\s*(\(?\d{3}\)?\s*[-.]?\s*\d{3}\s*[-.]?\s*\d{4})/gi;
+const MOBILE_PATTERN = /Mobile:\s*\+?1?\s*(\(?\d{3}\)?\s*[-.]?\s*\d{3}\s*[-.]?\s*\d{4})/g;
+const SECONDARY_PHONE_PATTERN = /Secondary\s+Phone:\s*\+?1?\s*(\(?\d{3}\)?\s*[-.]?\s*\d{3}\s*[-.]?\s*\d{4})/gi;
 const CITY_STATE_ZIP_PATTERN = /^([A-Z][A-Za-z\s]+,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?)$/;
 
 export function isTicketPage(rawText: string): boolean {

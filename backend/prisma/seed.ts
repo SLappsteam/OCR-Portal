@@ -69,6 +69,11 @@ const documentTypes = [
     name: 'Unclassified Document',
     description: 'Documents without barcode identification',
   },
+  {
+    code: 'CDR_REPORT',
+    name: 'Cash Drawer Report',
+    description: 'Cash drawer reconciliation summary with transaction totals',
+  },
 ];
 
 async function main(): Promise<void> {

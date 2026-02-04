@@ -10,6 +10,11 @@ import {
   parseTransactionReceipt,
   calculateReceiptConfidence,
 } from './transactionReceiptParser';
+import {
+  isCdrReport,
+  parseCdrReport,
+  calculateCdrConfidence,
+} from './cdrReportParser';
 import { scanBarcodeInRegion } from '../barcodeService';
 import { PageExtractionResult } from './types';
 import { logger } from '../../utils/logger';
@@ -92,6 +97,10 @@ export async function extractSinglePage(
 
     if (isSummaryPage(rawText)) {
       return buildSummaryResult(rawText, pageNumber, docTypeCode);
+    }
+
+    if (isCdrReport(rawText)) {
+      return buildCdrReportResult(rawText, pageNumber);
     }
 
     return buildDetailResult(rawText, pageNumber, docTypeCode);
@@ -192,6 +201,28 @@ function buildSummaryResult(
     page_number: pageNumber,
     document_type: docTypeCode,
     fields: { orders } as unknown as PageExtractionResult['fields'],
+    confidence,
+    raw_text: rawText,
+  };
+}
+
+function buildCdrReportResult(
+  rawText: string,
+  pageNumber: number
+): PageExtractionResult {
+  const fields = parseCdrReport(rawText);
+  const confidence = calculateCdrConfidence(fields);
+
+  logger.info(
+    `Extracted CDR_REPORT page ${pageNumber}: confidence=${(confidence * 100).toFixed(0)}%, ` +
+    `drawers=[${fields.cash_drawers}], total=${fields.grand_total}, ` +
+    `trans=${fields.trans_count}, orders=${fields.order_ids.length}`
+  );
+
+  return {
+    page_number: pageNumber,
+    document_type: 'CDR_REPORT',
+    fields: fields as unknown as PageExtractionResult['fields'],
     confidence,
     raw_text: rawText,
   };
