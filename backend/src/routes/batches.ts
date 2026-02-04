@@ -6,6 +6,7 @@ import { BadRequestError, NotFoundError } from '../middleware/errorHandler';
 import { processTiffScan } from '../services/batchProcessor';
 import { logger } from '../utils/logger';
 import { requireMinimumRole, requireRole } from '../middleware/authorize';
+import { buildStoreWhereClause } from '../utils/storeFilter';
 
 const router = Router();
 
@@ -35,9 +36,11 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const { storeNumber, status, parentOnly } = parsed.data;
+    const storeScope = buildStoreWhereClause(req.accessibleStoreIds);
 
     const batches = await prisma.batch.findMany({
       where: {
+        ...storeScope,
         store: storeNumber ? { store_number: storeNumber } : undefined,
         status: status ?? undefined,
         parent_batch_id: parentOnly === 'true' ? null : undefined,
@@ -64,8 +67,10 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       throw new BadRequestError('Invalid batch ID');
     }
 
-    const batch = await prisma.batch.findUnique({
-      where: { id },
+    const storeScope = buildStoreWhereClause(req.accessibleStoreIds);
+
+    const batch = await prisma.batch.findFirst({
+      where: { id, ...storeScope },
       include: {
         store: true,
         parentBatch: {

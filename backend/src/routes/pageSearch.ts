@@ -3,6 +3,7 @@ import { prisma } from '../utils/prisma';
 import { z } from 'zod';
 import { ApiResponse } from '../types';
 import { BadRequestError } from '../middleware/errorHandler';
+import { buildStoreWhereClause } from '../utils/storeFilter';
 
 const router = Router();
 
@@ -42,6 +43,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const { search, storeNumber, documentType, filters: rawFilters } = parsed.data;
+    const storeScope = buildStoreWhereClause(req.accessibleStoreIds);
 
     const searchFields = [
       'customer_name', 'order_id', 'customer_id', 'phone',
@@ -60,9 +62,10 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         OR: jsonOrFilters,
         ...(fieldAndConditions.length > 0 ? { AND: fieldAndConditions } : {}),
         document: {
-          batch: storeNumber
-            ? { store: { store_number: storeNumber } }
-            : undefined,
+          batch: {
+            ...storeScope,
+            ...(storeNumber ? { store: { store_number: storeNumber } } : {}),
+          },
           documentType: documentType ? { code: documentType } : undefined,
         },
       },

@@ -4,15 +4,24 @@ import sharp from 'sharp';
 import { extractPageAsPng } from '../services/tiffService';
 import { BadRequestError, NotFoundError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
+import { buildStoreWhereClause } from '../utils/storeFilter';
 
 const router = Router();
 
 const THUMBNAIL_WIDTH = 300;
 const CACHE_MAX_AGE = 300;
 
-async function getDocumentWithBatch(documentId: number) {
-  const document = await prisma.document.findUnique({
-    where: { id: documentId },
+async function getDocumentWithBatch(
+  documentId: number,
+  storeIds: number[] | null | undefined
+) {
+  const storeScope = buildStoreWhereClause(storeIds);
+
+  const document = await prisma.document.findFirst({
+    where: {
+      id: documentId,
+      batch: storeScope ? { ...storeScope } : undefined,
+    },
     include: { batch: true },
   });
 
@@ -34,7 +43,11 @@ router.get(
         throw new BadRequestError('Invalid batch ID or page number');
       }
 
-      const batch = await prisma.batch.findUnique({ where: { id: batchId } });
+      const storeScope = buildStoreWhereClause(req.accessibleStoreIds);
+
+      const batch = await prisma.batch.findFirst({
+        where: { id: batchId, ...storeScope },
+      });
       if (!batch) {
         throw new NotFoundError('Batch not found');
       }
@@ -67,7 +80,10 @@ router.get(
         throw new BadRequestError('Invalid document ID or page number');
       }
 
-      const document = await getDocumentWithBatch(documentId);
+      const document = await getDocumentWithBatch(
+        documentId,
+        req.accessibleStoreIds
+      );
 
       const imageBuffer = await extractPageAsPng(
         document.batch.file_path,
@@ -95,7 +111,10 @@ router.get(
         throw new BadRequestError('Invalid document ID');
       }
 
-      const document = await getDocumentWithBatch(documentId);
+      const document = await getDocumentWithBatch(
+        documentId,
+        req.accessibleStoreIds
+      );
       const imageBuffer = await extractPageAsPng(
         document.batch.file_path,
         document.page_number

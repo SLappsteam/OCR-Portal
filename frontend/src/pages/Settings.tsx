@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Folder, HardDrive, Archive, Activity, Trash2 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import type { ApiResponse } from '../types';
+import { OidcSettingsSection } from '../components/OidcSettingsSection';
 
 interface SettingsData {
   watchFolderPath: string;
@@ -28,7 +29,7 @@ export function Settings() {
       if (response.success && response.data) {
         setClearResult(`Cleared ${response.data.documents} documents, ${response.data.batches} batches`);
       }
-    } catch (err) {
+    } catch {
       setClearResult('Failed to clear data');
     } finally {
       setIsClearing(false);
@@ -148,6 +149,8 @@ export function Settings() {
           </div>
         </div>
       </div>
+
+      <OidcSettingsSection />
 
       <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
         <p>

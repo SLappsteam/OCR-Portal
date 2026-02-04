@@ -14,6 +14,7 @@ export type DocumentStatus =
 export type UserRole =
   | 'admin'
   | 'manager'
+  | 'finance_admin'
   | 'operator'
   | 'viewer';
 

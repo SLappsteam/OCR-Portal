@@ -23,6 +23,7 @@ interface AuthContextValue {
   login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => Promise<void>;
   checkMinimumRole: (role: string) => boolean;
+  refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -71,6 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
+  const refreshSession = useCallback(async () => {
+    const currentUser = await fetchCurrentUser();
+    setUser(currentUser);
+  }, []);
+
   const value: AuthContextValue = {
     user,
     isLoading,
@@ -78,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     checkMinimumRole,
+    refreshSession,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

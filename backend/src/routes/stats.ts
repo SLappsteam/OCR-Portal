@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prisma';
 import { ApiResponse } from '../types';
+import { buildStoreWhereClause } from '../utils/storeFilter';
 
 const router = Router();
 
@@ -21,8 +22,11 @@ interface DashboardStats {
 
 router.get(
   '/dashboard',
-  async (_req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const storeScope = buildStoreWhereClause(req.accessibleStoreIds);
+      const batchFilter = storeScope ? { batch: storeScope } : {};
+
       const [
         totalDocuments,
         totalBatches,
@@ -31,21 +35,25 @@ router.get(
         batchesByStatus,
         recentBatches,
       ] = await Promise.all([
-        prisma.document.count(),
-        prisma.batch.count(),
+        prisma.document.count({ where: batchFilter }),
+        prisma.batch.count({ where: storeScope }),
         prisma.document.groupBy({
           by: ['document_type_id'],
+          where: batchFilter,
           _count: { id: true },
         }),
         prisma.document.groupBy({
           by: ['batch_id'],
+          where: batchFilter,
           _count: { id: true },
         }),
         prisma.batch.groupBy({
           by: ['status'],
+          where: storeScope,
           _count: { id: true },
         }),
         prisma.batch.findMany({
+          where: storeScope,
           take: 10,
           orderBy: { created_at: 'desc' },
           include: { store: true },

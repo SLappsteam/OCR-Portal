@@ -1,15 +1,55 @@
-import { useState, type FormEvent } from 'react';
-import { Navigate } from 'react-router-dom';
+import { useState, useEffect, type FormEvent } from 'react';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { fetchOidcConfig } from '../api/authApi';
+import { setAccessToken } from '../api/client';
+
+const API_BASE_URL = import.meta.env['VITE_API_URL'] ?? '/api';
+
+const OIDC_ERROR_MESSAGES: Record<string, string> = {
+  account_disabled: 'Your account has been disabled. Contact an administrator.',
+  oidc_config: 'SSO is not properly configured. Contact an administrator.',
+  oidc_failed: 'SSO authentication failed. Please try again.',
+  expired_state: 'Your login session expired. Please try again.',
+  invalid_state: 'Invalid login session. Please try again.',
+  missing_params: 'Missing authentication parameters. Please try again.',
+};
 
 export function Login() {
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, isAuthenticated, isLoading, refreshSession } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isOidcEnabled, setIsOidcEnabled] = useState(false);
+  const [isOidcLoading, setIsOidcLoading] = useState(false);
 
-  if (isLoading) {
+  useEffect(() => {
+    fetchOidcConfig().then((config) => setIsOidcEnabled(config.enabled));
+  }, []);
+
+  useEffect(() => {
+    const oidcSuccess = searchParams.get('oidc');
+    const token = searchParams.get('token');
+    const oidcError = searchParams.get('error');
+
+    if (oidcSuccess === 'success' && token) {
+      setIsOidcLoading(true);
+      setAccessToken(token);
+      refreshSession()
+        .catch(() => setError('Failed to complete SSO login'))
+        .finally(() => {
+          setIsOidcLoading(false);
+          setSearchParams({}, { replace: true });
+        });
+    } else if (oidcError) {
+      setError(OIDC_ERROR_MESSAGES[oidcError] ?? `Login error: ${oidcError}`);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, refreshSession, setSearchParams]);
+
+  if (isLoading || isOidcLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-gray-600" />
@@ -33,6 +73,10 @@ export function Login() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function handleSsoClick() {
+    window.location.href = `${API_BASE_URL}/api/auth/oidc/authorize`;
   }
 
   return (
@@ -98,6 +142,30 @@ export function Login() {
               {isSubmitting ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
+
+          {isOidcEnabled && (
+            <>
+              <div className="my-4 flex items-center gap-3">
+                <div className="h-px flex-1 bg-gray-200" />
+                <span className="text-xs text-gray-400">or</span>
+                <div className="h-px flex-1 bg-gray-200" />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSsoClick}
+                className="flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                <svg width="18" height="18" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+                  <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+                  <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+                  <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+                </svg>
+                Sign in with Microsoft
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

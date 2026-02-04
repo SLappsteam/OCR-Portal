@@ -8,6 +8,7 @@ declare global {
   namespace Express {
     interface Request {
       user?: AccessTokenPayload;
+      accessibleStoreIds?: number[] | null;
     }
   }
 }

@@ -5,6 +5,7 @@ import { ApiResponse } from '../types';
 import { BadRequestError, NotFoundError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
 import { requireMinimumRole } from '../middleware/authorize';
+import { buildStoreWhereClause } from '../utils/storeFilter';
 
 const router = Router();
 
@@ -37,12 +38,14 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const { storeNumber, documentType, startDate, endDate, excludeCoversheets } = parsed.data;
+    const storeScope = buildStoreWhereClause(req.accessibleStoreIds);
 
     const documents = await prisma.document.findMany({
       where: {
-        batch: storeNumber
-          ? { store: { store_number: storeNumber } }
-          : undefined,
+        batch: {
+          ...storeScope,
+          ...(storeNumber ? { store: { store_number: storeNumber } } : {}),
+        },
         documentType: documentType ? { code: documentType } : undefined,
         is_coversheet: excludeCoversheets === 'true' ? false : undefined,
         created_at: {
@@ -91,8 +94,13 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       throw new BadRequestError('Invalid document ID');
     }
 
-    const document = await prisma.document.findUnique({
-      where: { id },
+    const storeScope = buildStoreWhereClause(req.accessibleStoreIds);
+
+    const document = await prisma.document.findFirst({
+      where: {
+        id,
+        batch: storeScope ? { ...storeScope } : undefined,
+      },
       include: {
         batch: {
           select: {

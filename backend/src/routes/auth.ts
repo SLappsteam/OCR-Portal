@@ -56,6 +56,14 @@ router.post('/login', async (req: Request, res: Response) => {
       return;
     }
 
+    if (user.auth_provider !== 'local' || !user.password_hash) {
+      res.status(401).json({
+        success: false,
+        error: 'This account uses SSO. Please sign in with Microsoft.',
+      });
+      return;
+    }
+
     const isValid = await verifyPassword(password, user.password_hash);
 
     if (!isValid) {

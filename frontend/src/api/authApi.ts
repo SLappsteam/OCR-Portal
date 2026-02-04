@@ -4,6 +4,23 @@ import { apiClient, getAccessToken, setAccessToken } from './client';
 
 const API_BASE_URL = import.meta.env['VITE_API_URL'] ?? '/api';
 
+export interface OidcConfig {
+  enabled: boolean;
+}
+
+export async function fetchOidcConfig(): Promise<OidcConfig> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/oidc/config`);
+    const data = await response.json();
+    if (data.success && data.data) {
+      return data.data as OidcConfig;
+    }
+    return { enabled: false };
+  } catch {
+    return { enabled: false };
+  }
+}
+
 export async function loginUser(
   credentials: LoginCredentials
 ): Promise<LoginResponse> {

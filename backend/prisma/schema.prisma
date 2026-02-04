@@ -7,6 +7,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model AppSetting {
+  key        String   @id
+  value      String
+  updated_at DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
 model DocumentType {
   id          Int        @id @default(autoincrement())
   code        String     @unique
@@ -108,11 +116,13 @@ model PageExtraction {
 model User {
   id               Int               @id @default(autoincrement())
   email            String            @unique
-  password_hash    String
+  password_hash    String?
   first_name       String
   last_name        String
   role             String            @default("viewer")
   is_active        Boolean           @default(true)
+  auth_provider    String            @default("local")
+  oidc_subject_id  String?           @unique
   last_login_at    DateTime?
   created_at       DateTime          @default(now())
   updated_at       DateTime          @updatedAt
