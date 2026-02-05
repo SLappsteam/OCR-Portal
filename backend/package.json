@@ -4,7 +4,7 @@
   "description": "Slumberland Document Processing System - Backend API",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "dev": "nodemon",
     "dev:restart": "ts-node scripts/restart.ts && npm run dev",
     "stop": "ts-node scripts/restart.ts",
     "build": "tsc",
@@ -49,9 +49,9 @@
     "@typescript-eslint/eslint-plugin": "^7.1.0",
     "@typescript-eslint/parser": "^7.1.0",
     "eslint": "^8.57.0",
+    "nodemon": "^3.1.11",
     "prisma": "^5.10.0",
     "ts-node": "^10.9.2",
-    "ts-node-dev": "^2.0.0",
     "typescript": "^5.3.3"
   },
   "engines": {
