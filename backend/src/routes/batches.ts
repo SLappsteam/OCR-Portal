@@ -7,6 +7,7 @@ import { processTiffScan } from '../services/batchProcessor';
 import { logger } from '../utils/logger';
 import { requireMinimumRole, requireRole } from '../middleware/authorize';
 import { buildStoreWhereClause } from '../utils/storeFilter';
+import { serializeBigIntFields } from '../utils/serialize';
 import {
   cursorPaginationSchema,
   buildCursorWhere,
@@ -14,14 +15,6 @@ import {
 } from '../utils/pagination';
 
 const router = Router();
-
-function serializeBatch(batch: Record<string, unknown>): Record<string, unknown> {
-  return JSON.parse(
-    JSON.stringify(batch, (_key, value) =>
-      typeof value === 'bigint' ? Number(value) : value
-    )
-  );
-}
 
 const querySchema = z.object({
   storeNumber: z.string().optional(),
@@ -64,7 +57,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       prisma.batch.count({ where: baseWhere }),
     ]);
 
-    const serialized = batches.map((b) => serializeBatch(b as Record<string, unknown>));
+    const serialized = batches.map((b) => serializeBigIntFields(b as Record<string, unknown>));
     const nextCursor = extractNextCursor(batches, limit);
     const response: CursorPaginatedResponse = {
       success: true,
@@ -123,7 +116,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 
     const response: ApiResponse = {
       success: true,
-      data: serializeBatch(batch as Record<string, unknown>),
+      data: serializeBigIntFields(batch as Record<string, unknown>),
     };
     res.json(response);
   } catch (error) {
@@ -170,7 +163,7 @@ router.patch(
       logger.info(`Batch ${id} store changed to ${store.store_number}`);
       const response: ApiResponse = {
         success: true,
-        data: serializeBatch(updated as Record<string, unknown>),
+        data: serializeBigIntFields(updated as Record<string, unknown>),
       };
       res.json(response);
     } catch (error) {

@@ -2,45 +2,53 @@ import { Search } from 'lucide-react';
 import { FieldFilterBar } from './FieldFilterBar';
 import type { FieldFilter } from '../types/filters';
 
-interface SearchFilterBarProps {
+export interface SearchProps {
   searchInput: string;
   onSearchChange: (value: string) => void;
+  isSearchMode: boolean;
+  fieldFilters: FieldFilter[];
+  onFieldFiltersChange: (filters: FieldFilter[]) => void;
+}
+
+export interface StoreFilterProps {
   storeNumber: string;
   onStoreChange: (value: string) => void;
   stores: { store_number: string }[];
+}
+
+export interface DocTypeFilterProps {
   documentType: string;
   onDocumentTypeChange: (value: string) => void;
   docTypes: { code: string; name: string }[];
-  isSearchMode: boolean;
+}
+
+export interface DateFilterProps {
   startDate: string;
   onStartDateChange: (value: string) => void;
   endDate: string;
   onEndDateChange: (value: string) => void;
-  fieldFilters: FieldFilter[];
-  onFieldFiltersChange: (filters: FieldFilter[]) => void;
   excludeCoversheets?: boolean;
   onExcludeCoversheetChange?: (value: boolean) => void;
 }
 
+interface SearchFilterBarProps {
+  searchProps: SearchProps;
+  storeFilterProps: StoreFilterProps;
+  docTypeFilterProps: DocTypeFilterProps;
+  dateFilterProps: DateFilterProps;
+}
+
 export function SearchFilterBar({
-  searchInput,
-  onSearchChange,
-  storeNumber,
-  onStoreChange,
-  stores,
-  documentType,
-  onDocumentTypeChange,
-  docTypes,
-  isSearchMode,
-  startDate,
-  onStartDateChange,
-  endDate,
-  onEndDateChange,
-  fieldFilters,
-  onFieldFiltersChange,
-  excludeCoversheets,
-  onExcludeCoversheetChange,
+  searchProps,
+  storeFilterProps,
+  docTypeFilterProps,
+  dateFilterProps,
 }: SearchFilterBarProps) {
+  const { searchInput, onSearchChange, isSearchMode, fieldFilters, onFieldFiltersChange } = searchProps;
+  const { storeNumber, onStoreChange, stores } = storeFilterProps;
+  const { documentType, onDocumentTypeChange, docTypes } = docTypeFilterProps;
+  const { startDate, onStartDateChange, endDate, onEndDateChange, excludeCoversheets, onExcludeCoversheetChange } = dateFilterProps;
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
       <div className="flex flex-wrap gap-3">

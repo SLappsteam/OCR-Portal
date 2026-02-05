@@ -1,4 +1,5 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { prisma } from '../utils/prisma';
 import {
   verifyPassword,
@@ -7,71 +8,39 @@ import {
   revokeAllUserTokens,
 } from '../services/authService';
 import { authenticate } from '../middleware/authenticate';
-import {
-  REFRESH_COOKIE_NAME,
-  REFRESH_COOKIE_MAX_AGE_MS,
-} from '../utils/authConstants';
+import { BadRequestError, UnauthorizedError, NotFoundError } from '../middleware/errorHandler';
+import { REFRESH_COOKIE_NAME } from '../utils/authConstants';
+import { setRefreshCookie, clearRefreshCookie } from '../utils/cookieHelpers';
 import { logger } from '../utils/logger';
 
 const router = Router();
 
-function setRefreshCookie(res: Response, token: string): void {
-  res.cookie(REFRESH_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env['NODE_ENV'] === 'production',
-    sameSite: 'strict',
-    path: '/',
-    maxAge: REFRESH_COOKIE_MAX_AGE_MS,
-  });
-}
+const loginSchema = z.object({
+  email: z.string().email('Valid email is required'),
+  password: z.string().min(1, 'Password is required'),
+});
 
-function clearRefreshCookie(res: Response): void {
-  res.clearCookie(REFRESH_COOKIE_NAME, {
-    httpOnly: true,
-    secure: process.env['NODE_ENV'] === 'production',
-    sameSite: 'strict',
-    path: '/',
-  });
-}
-
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      res.status(400).json({
-        success: false,
-        error: 'Email and password are required',
-      });
-      return;
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new BadRequestError(parsed.error.errors[0]?.message ?? 'Invalid input');
     }
 
+    const { email, password } = parsed.data;
     const user = await prisma.user.findUnique({ where: { email } });
 
     if (!user || !user.is_active) {
-      res.status(401).json({
-        success: false,
-        error: 'Invalid email or password',
-      });
-      return;
+      throw new UnauthorizedError('Invalid email or password');
     }
 
     if (user.auth_provider !== 'local' || !user.password_hash) {
-      res.status(401).json({
-        success: false,
-        error: 'This account uses SSO. Please sign in with Microsoft.',
-      });
-      return;
+      throw new UnauthorizedError('This account uses SSO. Please sign in with Microsoft.');
     }
 
     const isValid = await verifyPassword(password, user.password_hash);
-
     if (!isValid) {
-      res.status(401).json({
-        success: false,
-        error: 'Invalid email or password',
-      });
-      return;
+      throw new UnauthorizedError('Invalid email or password');
     }
 
     const { accessToken, refreshToken } = await generateTokenPair(user);
@@ -82,7 +51,6 @@ router.post('/login', async (req: Request, res: Response) => {
     });
 
     setRefreshCookie(res, refreshToken);
-
     logger.info(`User logged in: ${user.email}`);
 
     res.json({
@@ -99,26 +67,21 @@ router.post('/login', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    logger.error('Login error:', error);
-    res.status(500).json({ success: false, error: 'Login failed' });
+    next(error);
   }
 });
 
-router.post('/refresh', async (req: Request, res: Response) => {
+router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const oldToken = req.cookies?.[REFRESH_COOKIE_NAME];
-
     if (!oldToken) {
-      res.status(401).json({ success: false, error: 'No refresh token' });
-      return;
+      throw new UnauthorizedError('No refresh token');
     }
 
     const result = await rotateRefreshToken(oldToken);
-
     if (!result) {
       clearRefreshCookie(res);
-      res.status(401).json({ success: false, error: 'Invalid refresh token' });
-      return;
+      throw new UnauthorizedError('Invalid refresh token');
     }
 
     const user = await prisma.user.findUnique({
@@ -127,34 +90,30 @@ router.post('/refresh', async (req: Request, res: Response) => {
 
     if (!user || !user.is_active) {
       clearRefreshCookie(res);
-      res.status(401).json({ success: false, error: 'User not found' });
-      return;
+      throw new UnauthorizedError('User not found');
     }
 
     const { accessToken, refreshToken } = await generateTokenPair(user);
-
     setRefreshCookie(res, refreshToken);
 
     res.json({ success: true, data: { accessToken } });
   } catch (error) {
-    logger.error('Refresh error:', error);
-    res.status(500).json({ success: false, error: 'Token refresh failed' });
+    next(error);
   }
 });
 
-router.post('/logout', authenticate, async (req: Request, res: Response) => {
+router.post('/logout', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     await revokeAllUserTokens(req.user!.userId);
     clearRefreshCookie(res);
     logger.info(`User logged out: ${req.user!.email}`);
     res.json({ success: true, data: { message: 'Logged out' } });
   } catch (error) {
-    logger.error('Logout error:', error);
-    res.status(500).json({ success: false, error: 'Logout failed' });
+    next(error);
   }
 });
 
-router.get('/me', authenticate, async (req: Request, res: Response) => {
+router.get('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user!.userId },
@@ -169,8 +128,7 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
     });
 
     if (!user) {
-      res.status(404).json({ success: false, error: 'User not found' });
-      return;
+      throw new NotFoundError('User not found');
     }
 
     res.json({
@@ -185,8 +143,7 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    logger.error('Fetch user error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch user' });
+    next(error);
   }
 });
 

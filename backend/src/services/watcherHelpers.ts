@@ -7,9 +7,10 @@ import { calculateFileHash, parseLocationInfo, LocationInfo } from '../utils/fil
 import { archiveFile } from './storageService';
 import { processTiffScan } from './batchProcessor';
 
+import { generateReference } from '../utils/referenceGenerator';
+
 const MAX_REFERENCE_RETRIES = 10;
 const UNASSIGNED_STORE = 'UNASSIGNED';
-const REFERENCE_START = 100001;
 const MAX_CONCURRENT_BATCHES = parseInt(process.env['MAX_CONCURRENT_BATCHES'] ?? '4', 10);
 
 let activeBatches = 0;
@@ -75,24 +76,6 @@ export async function getOrCreateUnassigned(): Promise<number> {
   }
 
   return store.id;
-}
-
-async function generateReference(locationCode: string): Promise<string> {
-  const lastBatch = await prisma.batch.findFirst({
-    where: {
-      reference: { startsWith: locationCode },
-    },
-    orderBy: { reference: 'desc' },
-    select: { reference: true },
-  });
-
-  if (!lastBatch?.reference) {
-    return `${locationCode}${REFERENCE_START}`;
-  }
-
-  const lastNumber = parseInt(lastBatch.reference.slice(locationCode.length), 10);
-  const nextNumber = lastNumber + 1;
-  return `${locationCode}${nextNumber}`;
 }
 
 export async function createBatchWithRetry(

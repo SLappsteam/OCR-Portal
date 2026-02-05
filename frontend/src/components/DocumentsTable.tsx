@@ -1,19 +1,11 @@
 import { useMemo } from 'react';
-import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  flexRender,
-  type SortingState,
-  type ColumnDef,
-  type OnChangeFn,
-} from '@tanstack/react-table';
+import { type SortingState, type ColumnDef, type OnChangeFn } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { docTypeIcons, type DocumentRow } from './docTypeIcons';
 import { useTableSettings } from '../hooks/useTableSettings';
 import { DOCUMENTS_TABLE_COLUMNS, DOCUMENTS_DEFAULT_ORDER, buildColumnOptions } from './tableColumnConfigs';
-import { ColumnSettingsDropdown } from './ColumnSettingsDropdown';
-import { ResizableHeader } from './ResizableHeader';
+import { STATUS_STYLES } from './StatusBadge';
+import { DataTable } from './DataTable';
 
 interface DocumentsTableProps {
   documents: DocumentRow[];
@@ -21,14 +13,6 @@ interface DocumentsTableProps {
   onSortingChange: OnChangeFn<SortingState>;
   onDocumentClick: (batchId: number, pageNumber: number) => void;
 }
-
-const STATUS_STYLES: Record<string, { label: string; className: string }> = {
-  pending: { label: 'Pending', className: 'bg-yellow-100 text-yellow-800' },
-  processing: { label: 'Processing', className: 'bg-blue-100 text-blue-800' },
-  completed: { label: 'Complete', className: 'bg-green-100 text-green-800' },
-  failed: { label: 'Failed', className: 'bg-red-100 text-red-800' },
-  review_required: { label: 'Review', className: 'bg-orange-100 text-orange-800' },
-};
 
 const ALWAYS_VISIBLE: string[] = [];
 const DEFAULT_HIDDEN = [
@@ -206,73 +190,26 @@ export function DocumentsTable({
     []
   );
 
-  const table = useReactTable({
-    data: documents,
-    columns,
-    state: { sorting, columnVisibility, columnSizing, columnOrder },
-    onSortingChange,
-    onColumnVisibilityChange,
-    onColumnSizingChange,
-    onColumnOrderChange,
-    columnResizeMode: 'onChange',
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-  });
-
   const columnOptions = buildColumnOptions(DOCUMENTS_TABLE_COLUMNS, columnVisibility, columnOrder);
 
-  if (documents.length === 0) {
-    return <div className="p-8 text-center text-gray-500">No documents found</div>;
-  }
-
   return (
-    <div>
-      <div className="flex justify-end px-4 py-2 border-b border-gray-100">
-        <ColumnSettingsDropdown
-          columns={columnOptions}
-          onToggle={toggleColumn}
-          onReorder={reorderColumns}
-          onReset={resetToDefaults}
-        />
-      </div>
-      <table className="w-full" style={{ tableLayout: 'fixed' }}>
-        <thead className="bg-gray-50 border-b border-gray-100">
-          {table.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <ResizableHeader key={header.id} header={header} />
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {table.getRowModel().rows.map((row) => (
-            <tr
-              key={row.id}
-              className="hover:bg-gray-50 cursor-pointer"
-              role="button"
-              tabIndex={0}
-              onClick={() => onDocumentClick(row.original.batch.id, row.original.page_number)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onDocumentClick(row.original.batch.id, row.original.page_number);
-                }
-              }}
-            >
-              {row.getVisibleCells().map((cell) => (
-                <td
-                  key={cell.id}
-                  className="px-4 py-3"
-                  style={{ width: cell.column.getSize() }}
-                >
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      data={documents}
+      columns={columns}
+      sorting={sorting}
+      onSortingChange={onSortingChange}
+      columnVisibility={columnVisibility}
+      onColumnVisibilityChange={onColumnVisibilityChange}
+      columnSizing={columnSizing}
+      onColumnSizingChange={onColumnSizingChange}
+      columnOrder={columnOrder}
+      onColumnOrderChange={onColumnOrderChange}
+      columnOptions={columnOptions}
+      onToggleColumn={toggleColumn}
+      onReorderColumns={reorderColumns}
+      onResetColumns={resetToDefaults}
+      emptyMessage="No documents found"
+      onRowClick={(row) => onDocumentClick(row.batch.id, row.page_number)}
+    />
   );
 }

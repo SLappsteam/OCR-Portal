@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { FileText, FolderOpen, AlertCircle, Store } from 'lucide-react';
 import { fetchDashboardStats, type DashboardStats } from '../api/client';
+import { StatusBadge } from '../components/StatusBadge';
 
 interface StatCardProps {
   title: string;
@@ -21,25 +22,6 @@ function StatCard({ title, value, icon, color }: StatCardProps) {
         <div className={`p-2.5 rounded-lg ${color}`}>{icon}</div>
       </div>
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    processing: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    failed: 'bg-red-100 text-red-800',
-  };
-
-  return (
-    <span
-      className={`px-2 py-1 text-xs font-medium rounded-full ${
-        colors[status] ?? 'bg-gray-100 text-gray-800'
-      }`}
-    >
-      {status.toUpperCase()}
-    </span>
   );
 }
 

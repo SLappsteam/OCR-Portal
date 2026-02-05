@@ -7,14 +7,20 @@ const ORIENTATION_CONFIDENCE_THRESHOLD = 10;
 const ORIENTATION_CONFIDENCE_MAX = 70;
 const DESKEW_ANGLE_THRESHOLD = 0.5;
 const MAX_DESKEW_ANGLE = 10;
+const DEFAULT_PAGE_WIDTH = 1700;
+const DEFAULT_PAGE_HEIGHT = 2200;
+const SAMPLE_REGION_TOP_PCT = 0.2;
+const SAMPLE_REGION_HEIGHT_PCT = 0.35;
+const MIN_BASELINE_LENGTH = 100;
+const BINARY_THRESHOLD = 170;
 
 async function sampleUnifiedRegion(imageBuffer: Buffer): Promise<Buffer> {
   const metadata = await sharp(imageBuffer).metadata();
-  const width = metadata.width ?? 1700;
-  const height = metadata.height ?? 2200;
+  const width = metadata.width ?? DEFAULT_PAGE_WIDTH;
+  const height = metadata.height ?? DEFAULT_PAGE_HEIGHT;
 
-  const sampleTop = Math.floor(height * 0.2);
-  const sampleHeight = Math.floor(height * 0.35);
+  const sampleTop = Math.floor(height * SAMPLE_REGION_TOP_PCT);
+  const sampleHeight = Math.floor(height * SAMPLE_REGION_HEIGHT_PCT);
 
   return sharp(imageBuffer)
     .extract({ left: 0, top: sampleTop, width, height: sampleHeight })
@@ -45,7 +51,7 @@ function calculateSkewFromLines(lines: Tesseract.Line[]): number {
     const dx = bl.x1 - bl.x0;
     const dy = bl.y1 - bl.y0;
 
-    if (Math.abs(dx) < 100) continue;
+    if (Math.abs(dx) < MIN_BASELINE_LENGTH) continue;
 
     const angle = Math.atan2(dy, dx) * (180 / Math.PI);
 
@@ -95,7 +101,7 @@ export async function correctPageImage(
       .grayscale()
       .normalize()
       .blur(1.0)
-      .threshold(170)
+      .threshold(BINARY_THRESHOLD)
       .png()
       .toBuffer();
 

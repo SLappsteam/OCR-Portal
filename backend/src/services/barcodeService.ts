@@ -9,6 +9,13 @@ const OCR_NOISE_CHARS = /[^A-Z0-9]/g;
 // Content allows OCR noise chars (?, !, .) that get stripped during cleanup.
 const BARCODE_TEXT_PATTERN = /[*"'+]([A-Z0-9][A-Z0-9?!.,;: ]{1,11})[*"'~?)\]|]/;
 
+const DEFAULT_PAGE_WIDTH = 1700;
+const DEFAULT_PAGE_HEIGHT = 2200;
+const BARCODE_CROP_TOP_PCT = 0.25;
+const BARCODE_CROP_HEIGHT_PCT = 0.25;
+const OCR_LABEL_TOP_PCT = 0.35;
+const OCR_LABEL_HEIGHT_PCT = 0.15;
+
 /** Convert Node.js Buffer to a plain ArrayBuffer (for zbar-wasm) */
 function bufferToArrayBuffer(buf: Buffer): ArrayBuffer {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
@@ -28,11 +35,11 @@ async function cropForBarcode(
   imageBuffer: Buffer
 ): Promise<{ data: ArrayBuffer; width: number; height: number }> {
   const metadata = await sharp(imageBuffer).metadata();
-  const width = metadata.width ?? 1700;
-  const height = metadata.height ?? 2200;
+  const width = metadata.width ?? DEFAULT_PAGE_WIDTH;
+  const height = metadata.height ?? DEFAULT_PAGE_HEIGHT;
 
-  const cropTop = Math.floor(height * 0.25);
-  const cropHeight = Math.floor(height * 0.25);
+  const cropTop = Math.floor(height * BARCODE_CROP_TOP_PCT);
+  const cropHeight = Math.floor(height * BARCODE_CROP_HEIGHT_PCT);
 
   const { data, info } = await sharp(imageBuffer)
     .extract({ left: 0, top: cropTop, width, height: cropHeight })
@@ -69,12 +76,12 @@ async function detectBarcodeWithOCR(
 ): Promise<string | null> {
   try {
     const metadata = await sharp(imageBuffer).metadata();
-    const width = metadata.width ?? 1700;
-    const height = metadata.height ?? 2200;
+    const width = metadata.width ?? DEFAULT_PAGE_WIDTH;
+    const height = metadata.height ?? DEFAULT_PAGE_HEIGHT;
 
     // Crop to barcode label region (upper portion where coversheet text is)
-    const cropTop = Math.floor(height * 0.35);
-    const cropHeight = Math.floor(height * 0.15);
+    const cropTop = Math.floor(height * OCR_LABEL_TOP_PCT);
+    const cropHeight = Math.floor(height * OCR_LABEL_HEIGHT_PCT);
     const cropped = await sharp(imageBuffer)
       .extract({ left: 0, top: cropTop, width, height: cropHeight })
       .grayscale()
@@ -109,8 +116,8 @@ export async function scanBarcodeInRegion(
   try {
     const scan = await getZbarScanner();
     const metadata = await sharp(imageBuffer).metadata();
-    const width = metadata.width ?? 1700;
-    const height = metadata.height ?? 2200;
+    const width = metadata.width ?? DEFAULT_PAGE_WIDTH;
+    const height = metadata.height ?? DEFAULT_PAGE_HEIGHT;
 
     const cropTop = Math.floor(height * topPct);
     const cropHeight = Math.min(

@@ -98,23 +98,31 @@ export function Documents() {
       </div>
 
       <SearchFilterBar
-        searchInput={searchInput}
-        onSearchChange={handleSearchChange}
-        storeNumber={filters.storeNumber}
-        onStoreChange={(v) => setFilters((f) => ({ ...f, storeNumber: v }))}
-        stores={stores}
-        documentType={filters.documentType}
-        onDocumentTypeChange={(v) => setFilters((f) => ({ ...f, documentType: v }))}
-        docTypes={docTypes}
-        isSearchMode={isSearchMode}
-        startDate={filters.startDate}
-        onStartDateChange={(v) => setFilters((f) => ({ ...f, startDate: v }))}
-        endDate={filters.endDate}
-        onEndDateChange={(v) => setFilters((f) => ({ ...f, endDate: v }))}
-        fieldFilters={fieldFilters}
-        onFieldFiltersChange={setFieldFilters}
-        excludeCoversheets={filters.excludeCoversheets}
-        onExcludeCoversheetChange={(v) => setFilters((f) => ({ ...f, excludeCoversheets: v }))}
+        searchProps={{
+          searchInput,
+          onSearchChange: handleSearchChange,
+          isSearchMode,
+          fieldFilters,
+          onFieldFiltersChange: setFieldFilters,
+        }}
+        storeFilterProps={{
+          storeNumber: filters.storeNumber,
+          onStoreChange: (v) => setFilters((f) => ({ ...f, storeNumber: v })),
+          stores,
+        }}
+        docTypeFilterProps={{
+          documentType: filters.documentType,
+          onDocumentTypeChange: (v) => setFilters((f) => ({ ...f, documentType: v })),
+          docTypes,
+        }}
+        dateFilterProps={{
+          startDate: filters.startDate,
+          onStartDateChange: (v) => setFilters((f) => ({ ...f, startDate: v })),
+          endDate: filters.endDate,
+          onEndDateChange: (v) => setFilters((f) => ({ ...f, endDate: v })),
+          excludeCoversheets: filters.excludeCoversheets,
+          onExcludeCoversheetChange: (v) => setFilters((f) => ({ ...f, excludeCoversheets: v })),
+        }}
       />
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">

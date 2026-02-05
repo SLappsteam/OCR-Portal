@@ -6,6 +6,7 @@ import { BadRequestError, NotFoundError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
 import { requireMinimumRole } from '../middleware/authorize';
 import { buildStoreWhereClause } from '../utils/storeFilter';
+import { serializeBigIntFields } from '../utils/serialize';
 import {
   cursorPaginationSchema,
   buildCursorWhere,
@@ -13,14 +14,6 @@ import {
 } from '../utils/pagination';
 
 const router = Router();
-
-function serializeDocument(doc: Record<string, unknown>): Record<string, unknown> {
-  return JSON.parse(
-    JSON.stringify(doc, (_key, value) =>
-      typeof value === 'bigint' ? Number(value) : value
-    )
-  );
-}
 
 const querySchema = z.object({
   storeNumber: z.string().optional(),
@@ -85,7 +78,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     ]);
 
     const serialized = documents.map((d) => {
-      const raw = serializeDocument(d as unknown as Record<string, unknown>);
+      const raw = serializeBigIntFields(d as unknown as Record<string, unknown>);
       const extractions = raw['pageExtractions'] as { fields: unknown; confidence: number }[] | undefined;
       raw['extraction_fields'] = extractions?.[0]?.fields ?? null;
       raw['confidence'] = extractions?.[0]?.confidence ?? null;
@@ -139,7 +132,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 
     const response: ApiResponse = {
       success: true,
-      data: serializeDocument(document as unknown as Record<string, unknown>),
+      data: serializeBigIntFields(document as unknown as Record<string, unknown>),
     };
     res.json(response);
   } catch (error) {
@@ -200,7 +193,7 @@ router.patch(
       logger.info(`Document ${id} updated`);
       const response: ApiResponse = {
         success: true,
-        data: serializeDocument(updated as unknown as Record<string, unknown>),
+        data: serializeBigIntFields(updated as unknown as Record<string, unknown>),
       };
       res.json(response);
     } catch (error) {

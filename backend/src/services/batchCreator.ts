@@ -1,30 +1,13 @@
 import { prisma } from '../utils/prisma';
 import { getDocumentTypeByCode } from './barcodeService';
 import { logger } from '../utils/logger';
-const REFERENCE_START = 100001;
+import { generateReference } from '../utils/referenceGenerator';
 
 export function generateChildReference(
   parentRef: string,
   index: number
 ): string {
   return `${parentRef}-${index + 1}`;
-}
-
-async function generateReference(locationCode: string): Promise<string> {
-  const lastBatch = await prisma.batch.findFirst({
-    where: { reference: { startsWith: locationCode } },
-    orderBy: { reference: 'desc' },
-    select: { reference: true },
-  });
-
-  if (!lastBatch?.reference) {
-    return `${locationCode}${REFERENCE_START}`;
-  }
-
-  const lastNumber = parseInt(
-    lastBatch.reference.slice(locationCode.length), 10
-  );
-  return `${locationCode}${lastNumber + 1}`;
 }
 
 export async function createChildBatch(
