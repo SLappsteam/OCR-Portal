@@ -5,6 +5,7 @@ const API_BASE_URL = import.meta.env['VITE_API_URL'] ?? '/api';
 
 let accessToken: string | null = null;
 let refreshHandler: (() => Promise<boolean>) | null = null;
+let sessionExpiredHandler: (() => void) | null = null;
 
 export function setAccessToken(token: string | null): void {
   accessToken = token;
@@ -16,6 +17,10 @@ export function getAccessToken(): string | null {
 
 export function setRefreshHandler(handler: () => Promise<boolean>): void {
   refreshHandler = handler;
+}
+
+export function setSessionExpiredHandler(handler: () => void): void {
+  sessionExpiredHandler = handler;
 }
 
 export interface HealthCheckResponse {
@@ -72,6 +77,10 @@ class ApiClient {
       if (refreshed) {
         const retryConfig = this.buildConfig(options);
         response = await fetch(url, retryConfig);
+      } else {
+        accessToken = null;
+        sessionExpiredHandler?.();
+        throw new Error('Session expired');
       }
     }
 

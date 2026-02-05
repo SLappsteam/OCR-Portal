@@ -8,7 +8,7 @@ import {
 } from 'react';
 import type { AuthUser, LoginCredentials } from '../types/auth';
 import { hasMinimumRole } from '../utils/roleUtils';
-import { setAccessToken, setRefreshHandler } from '../api/client';
+import { setAccessToken, setRefreshHandler, setSessionExpiredHandler } from '../api/client';
 import {
   loginUser,
   logoutUser,
@@ -34,6 +34,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setRefreshHandler(refreshAccessToken);
+    setSessionExpiredHandler(() => {
+      setAccessToken(null);
+      setUser(null);
+    });
   }, []);
 
   useEffect(() => {
