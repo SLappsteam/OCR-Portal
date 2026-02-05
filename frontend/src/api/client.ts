@@ -288,15 +288,22 @@ export async function fetchDocumentTypes() {
   return response.data ?? [];
 }
 
+function appendTokenParam(url: string): string {
+  const token = getAccessToken();
+  if (!token) return url;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}token=${encodeURIComponent(token)}`;
+}
+
 export function getPreviewUrl(documentId: number, page: number): string {
-  return `${API_BASE_URL}/api/preview/${documentId}/${page}`;
+  return appendTokenParam(`${API_BASE_URL}/api/preview/${documentId}/${page}`);
 }
 
 export function getThumbnailUrl(documentId: number): string {
-  return `${API_BASE_URL}/api/preview/${documentId}/thumbnail`;
+  return appendTokenParam(`${API_BASE_URL}/api/preview/${documentId}/thumbnail`);
 }
 
 export function getBatchPreviewUrl(batchId: number, pageNumber: number): string {
-  return `${API_BASE_URL}/api/preview/batch/${batchId}/${pageNumber}`;
+  return appendTokenParam(`${API_BASE_URL}/api/preview/batch/${batchId}/${pageNumber}`);
 }
 

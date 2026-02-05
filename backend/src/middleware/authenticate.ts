@@ -7,17 +7,15 @@ export function authenticate(
   res: Response,
   next: NextFunction
 ): void {
-  const authHeader = req.headers.authorization;
+  const token = extractToken(req);
 
-  if (!authHeader?.startsWith('Bearer ')) {
+  if (!token) {
     res.status(401).json({
       success: false,
       error: 'Authentication required',
     });
     return;
   }
-
-  const token = authHeader.slice(7);
 
   try {
     req.user = verifyAccessToken(token);
@@ -29,4 +27,18 @@ export function authenticate(
       error: 'Invalid or expired token',
     });
   }
+}
+
+function extractToken(req: Request): string | null {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.slice(7);
+  }
+
+  const queryToken = req.query['token'];
+  if (typeof queryToken === 'string' && queryToken.length > 0) {
+    return queryToken;
+  }
+
+  return null;
 }
