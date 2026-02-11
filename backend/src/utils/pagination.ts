@@ -3,6 +3,40 @@ import { z } from 'zod';
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 500;
 
+export const offsetPaginationSchema = z.object({
+  page: z
+    .string()
+    .optional()
+    .transform((val) => {
+      if (!val) return 1;
+      const parsed = parseInt(val, 10);
+      return isNaN(parsed) || parsed < 1 ? 1 : parsed;
+    }),
+  limit: z
+    .string()
+    .optional()
+    .transform((val) => {
+      if (!val) return DEFAULT_PAGE_SIZE;
+      const parsed = parseInt(val, 10);
+      if (isNaN(parsed) || parsed < 1) return DEFAULT_PAGE_SIZE;
+      return Math.min(parsed, MAX_PAGE_SIZE);
+    }),
+});
+
+export interface OffsetPaginationParams {
+  page: number;
+  limit: number;
+}
+
+export function calculateSkip(page: number, limit: number): number {
+  return (page - 1) * limit;
+}
+
+export function calculateTotalPages(totalCount: number, limit: number): number {
+  return Math.ceil(totalCount / limit);
+}
+
+// Keep cursor-based for backwards compatibility
 export const cursorPaginationSchema = z.object({
   cursor: z
     .string()

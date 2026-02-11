@@ -11,9 +11,12 @@ import {
 import { DocumentsTable } from '../components/DocumentsTable';
 import { PageSearchTable } from '../components/PageSearchTable';
 import { SearchFilterBar } from '../components/SearchFilterBar';
+import { Pagination } from '../components/Pagination';
 import type { DocumentRow } from '../components/docTypeIcons';
 import type { PageSearchResult } from '../types/extraction';
 import type { FieldFilter } from '../types/filters';
+
+const PAGE_SIZE = 100;
 
 export function Documents() {
   const navigate = useNavigate();
@@ -22,10 +25,11 @@ export function Documents() {
   const [stores, setStores] = useState<{ store_number: string }[]>([]);
   const [docTypes, setDocTypes] = useState<{ code: string; name: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [fieldFilters, setFieldFilters] = useState<FieldFilter[]>([]);
-  const [nextCursor, setNextCursor] = useState<number | null>(null);
+
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
   const [filters, setFilters] = useState({
@@ -56,12 +60,8 @@ export function Documents() {
       .catch(() => toast.error('Failed to load filter options'));
   }, []);
 
-  const loadDocuments = (append = false, cursor?: number) => {
-    if (append) {
-      setIsLoadingMore(true);
-    } else {
-      setIsLoading(true);
-    }
+  const loadDocuments = (targetPage: number) => {
+    setIsLoading(true);
 
     if (filters.search) {
       searchPages({
@@ -72,45 +72,39 @@ export function Documents() {
       })
         .then((results) => {
           setPageResults(results);
-          setNextCursor(null);
           setTotalCount(results.length);
+          setTotalPages(1);
+          setPage(1);
         })
         .catch(() => toast.error('Failed to search pages'))
-        .finally(() => {
-          setIsLoading(false);
-          setIsLoadingMore(false);
-        });
+        .finally(() => setIsLoading(false));
     } else {
       fetchDocuments({
         storeNumber: filters.storeNumber || undefined,
         documentType: filters.documentType || undefined,
         excludeCoversheets: filters.excludeCoversheets,
-        cursor,
-        limit: 100,
+        page: targetPage,
+        limit: PAGE_SIZE,
       })
         .then((response) => {
-          const newDocs = response.data as DocumentRow[];
-          setDocuments((prev) => (append ? [...prev, ...newDocs] : newDocs));
-          setNextCursor(response.nextCursor);
+          setDocuments(response.data as DocumentRow[]);
+          setPage(response.page);
+          setTotalPages(response.totalPages);
           setTotalCount(response.totalCount);
         })
         .catch(() => toast.error('Failed to load documents'))
-        .finally(() => {
-          setIsLoading(false);
-          setIsLoadingMore(false);
-        });
-    }
-  };
-
-  const loadMore = () => {
-    if (nextCursor) {
-      loadDocuments(true, nextCursor);
+        .finally(() => setIsLoading(false));
     }
   };
 
   useEffect(() => {
-    loadDocuments(false);
+    setPage(1);
+    loadDocuments(1);
   }, [filters, fieldFilters]);
+
+  const handlePageChange = (newPage: number) => {
+    loadDocuments(newPage);
+  };
 
   const handleDocumentClick = (batchId: number, pageNumber: number) => {
     navigate(`/batches/${batchId}?page=${pageNumber}`);
@@ -159,40 +153,38 @@ export function Documents() {
         }}
       />
 
-      <div className="flex justify-between items-center text-sm text-gray-600">
-        <span>
-          Showing {isSearchMode ? pageResults.length : documents.length} of {totalCount} {isSearchMode ? 'results' : 'documents'}
-        </span>
-      </div>
-
       <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
         {isLoading ? (
           <div className="p-8 text-center text-gray-500">Loading...</div>
         ) : isSearchMode ? (
-          <PageSearchTable
-            results={pageResults}
-            sorting={sorting}
-            onSortingChange={setSorting}
-            onRowClick={handlePageResultClick}
-          />
+          <>
+            <PageSearchTable
+              results={pageResults}
+              sorting={sorting}
+              onSortingChange={setSorting}
+              onRowClick={handlePageResultClick}
+            />
+            <div className="px-4 py-3 border-t border-gray-100 text-sm text-gray-600">
+              Showing {pageResults.length} search results
+            </div>
+          </>
         ) : (
-          <DocumentsTable
-            documents={documents}
-            sorting={sorting}
-            onSortingChange={setSorting}
-            onDocumentClick={handleDocumentClick}
-          />
-        )}
-        {nextCursor && !isLoading && !isSearchMode && (
-          <div className="p-4 border-t border-gray-100 text-center">
-            <button
-              onClick={loadMore}
-              disabled={isLoadingMore}
-              className="px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600 disabled:opacity-50"
-            >
-              {isLoadingMore ? 'Loading...' : `Load More (${totalCount - documents.length} remaining)`}
-            </button>
-          </div>
+          <>
+            <DocumentsTable
+              documents={documents}
+              sorting={sorting}
+              onSortingChange={setSorting}
+              onDocumentClick={handleDocumentClick}
+            />
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              limit={PAGE_SIZE}
+              onPageChange={handlePageChange}
+              isLoading={isLoading}
+            />
+          </>
         )}
       </div>
     </div>

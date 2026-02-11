@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prisma';
 import { z } from 'zod';
-import { ApiResponse, CursorPaginatedResponse } from '../types';
+import { ApiResponse, OffsetPaginatedResponse } from '../types';
 import { BadRequestError, NotFoundError } from '../middleware/errorHandler';
 import { processTiffScan } from '../services/batchProcessor';
 import { logger } from '../utils/logger';
@@ -9,9 +9,9 @@ import { requireMinimumRole, requireRole } from '../middleware/authorize';
 import { buildStoreWhereClause } from '../utils/storeFilter';
 import { serializeBigIntFields } from '../utils/serialize';
 import {
-  cursorPaginationSchema,
-  buildCursorWhere,
-  extractNextCursor,
+  offsetPaginationSchema,
+  calculateSkip,
+  calculateTotalPages,
 } from '../utils/pagination';
 
 const router = Router();
@@ -20,7 +20,7 @@ const querySchema = z.object({
   storeNumber: z.string().optional(),
   status: z.string().optional(),
   parentOnly: z.string().optional(),
-}).merge(cursorPaginationSchema);
+}).merge(offsetPaginationSchema);
 
 const updateBatchSchema = z.object({
   storeId: z.number().int().positive(),
@@ -33,37 +33,38 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       throw new BadRequestError('Invalid query parameters');
     }
 
-    const { storeNumber, status, parentOnly, cursor, limit } = parsed.data;
+    const { storeNumber, status, parentOnly, page, limit } = parsed.data;
     const storeScope = buildStoreWhereClause(req.accessibleStoreIds);
 
-    const baseWhere = {
+    const where = {
       ...storeScope,
       store: storeNumber ? { store_number: storeNumber } : undefined,
       status: status ?? undefined,
       parent_batch_id: parentOnly === 'true' ? null : undefined,
     };
-    const cursorWhere = { ...baseWhere, ...buildCursorWhere(cursor) };
 
     const [batches, totalCount] = await Promise.all([
       prisma.batch.findMany({
-        where: cursorWhere,
+        where,
         include: {
           store: true,
           _count: { select: { documents: true, childBatches: true } },
         },
         orderBy: { id: 'desc' },
+        skip: calculateSkip(page, limit),
         take: limit,
       }),
-      prisma.batch.count({ where: baseWhere }),
+      prisma.batch.count({ where }),
     ]);
 
     const serialized = batches.map((b) => serializeBigIntFields(b as Record<string, unknown>));
-    const nextCursor = extractNextCursor(batches, limit);
-    const response: CursorPaginatedResponse = {
+    const response: OffsetPaginatedResponse = {
       success: true,
       data: serialized,
-      nextCursor,
+      page,
+      limit,
       totalCount,
+      totalPages: calculateTotalPages(totalCount, limit),
     };
     res.json(response);
   } catch (error) {

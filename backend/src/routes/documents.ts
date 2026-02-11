@@ -1,16 +1,16 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prisma';
 import { z } from 'zod';
-import { ApiResponse, CursorPaginatedResponse } from '../types';
+import { ApiResponse, OffsetPaginatedResponse } from '../types';
 import { BadRequestError, NotFoundError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
 import { requireMinimumRole } from '../middleware/authorize';
 import { buildStoreWhereClause } from '../utils/storeFilter';
 import { serializeBigIntFields } from '../utils/serialize';
 import {
-  cursorPaginationSchema,
-  buildCursorWhere,
-  extractNextCursor,
+  offsetPaginationSchema,
+  calculateSkip,
+  calculateTotalPages,
 } from '../utils/pagination';
 
 const router = Router();
@@ -21,7 +21,7 @@ const querySchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   excludeCoversheets: z.string().optional(),
-}).merge(cursorPaginationSchema);
+}).merge(offsetPaginationSchema);
 
 const updateSchema = z.object({
   storeId: z.number().int().positive().optional(),
@@ -35,10 +35,10 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       throw new BadRequestError('Invalid query parameters');
     }
 
-    const { storeNumber, documentType, startDate, endDate, excludeCoversheets, cursor, limit } = parsed.data;
+    const { storeNumber, documentType, startDate, endDate, excludeCoversheets, page, limit } = parsed.data;
     const storeScope = buildStoreWhereClause(req.accessibleStoreIds);
 
-    const baseWhere = {
+    const where = {
       batch: {
         ...storeScope,
         ...(storeNumber ? { store: { store_number: storeNumber } } : {}),
@@ -50,11 +50,10 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         lte: endDate ? new Date(endDate) : undefined,
       },
     };
-    const cursorWhere = { ...baseWhere, ...buildCursorWhere(cursor) };
 
     const [documents, totalCount] = await Promise.all([
       prisma.document.findMany({
-        where: cursorWhere,
+        where,
         include: {
           batch: {
             select: {
@@ -72,9 +71,10 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
           },
         },
         orderBy: { id: 'desc' },
+        skip: calculateSkip(page, limit),
         take: limit,
       }),
-      prisma.document.count({ where: baseWhere }),
+      prisma.document.count({ where }),
     ]);
 
     const serialized = documents.map((d) => {
@@ -85,12 +85,13 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       delete raw['pageExtractions'];
       return raw;
     });
-    const nextCursor = extractNextCursor(documents, limit);
-    const response: CursorPaginatedResponse = {
+    const response: OffsetPaginatedResponse = {
       success: true,
       data: serialized,
-      nextCursor,
+      page,
+      limit,
       totalCount,
+      totalPages: calculateTotalPages(totalCount, limit),
     };
     res.json(response);
   } catch (error) {

@@ -41,6 +41,15 @@ export interface CursorPaginatedResponse<T = unknown> {
   totalCount: number;
 }
 
+export interface OffsetPaginatedResponse<T = unknown> {
+  success: boolean;
+  data: T[];
+  page: number;
+  limit: number;
+  totalCount: number;
+  totalPages: number;
+}
+
 export interface HealthCheckResponse {
   status: 'ok' | 'degraded' | 'error';
   timestamp: string;

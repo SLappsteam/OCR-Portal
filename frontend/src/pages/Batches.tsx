@@ -16,6 +16,7 @@ import {
 import { toast } from 'react-toastify';
 import { fetchBatches, fetchStores, reprocessBatch } from '../api/client';
 import { BatchDetailsPanel } from '../components/BatchDetailsPanel';
+import { Pagination } from '../components/Pagination';
 import { buildBatchColumns, type BatchRow } from '../components/batchColumnDefs';
 
 interface StoreData {
@@ -23,15 +24,18 @@ interface StoreData {
   store_number: string;
 }
 
+const PAGE_SIZE = 100;
+
 export function Batches() {
   const [batches, setBatches] = useState<BatchRow[]>([]);
   const [stores, setStores] = useState<StoreData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [reprocessing, setReprocessing] = useState<number | null>(null);
-  const [nextCursor, setNextCursor] = useState<number | null>(null);
+
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
   const [filters, setFilters] = useState({
@@ -49,47 +53,39 @@ export function Batches() {
     loadStores();
   }, []);
 
-  const loadBatches = (append = false, cursor?: number) => {
-    if (append) {
-      setIsLoadingMore(true);
-    } else {
-      setIsLoading(true);
-    }
+  const loadBatches = (targetPage: number) => {
+    setIsLoading(true);
     const params = {
       ...(filters.storeNumber || filters.status ? filters : {}),
-      cursor,
-      limit: 100,
+      page: targetPage,
+      limit: PAGE_SIZE,
     };
     fetchBatches(params)
       .then((response) => {
-        const newBatches = response.data as BatchRow[];
-        setBatches((prev) => (append ? [...prev, ...newBatches] : newBatches));
-        setNextCursor(response.nextCursor);
+        setBatches(response.data as BatchRow[]);
+        setPage(response.page);
+        setTotalPages(response.totalPages);
         setTotalCount(response.totalCount);
       })
       .catch(() => toast.error('Failed to load batches'))
-      .finally(() => {
-        setIsLoading(false);
-        setIsLoadingMore(false);
-      });
-  };
-
-  const loadMore = () => {
-    if (nextCursor) {
-      loadBatches(true, nextCursor);
-    }
+      .finally(() => setIsLoading(false));
   };
 
   useEffect(() => {
-    loadBatches(false);
+    setPage(1);
+    loadBatches(1);
   }, [filters]);
+
+  const handlePageChange = (newPage: number) => {
+    loadBatches(newPage);
+  };
 
   const handleReprocess = async (batchId: number) => {
     setReprocessing(batchId);
     try {
       await reprocessBatch(batchId);
-      loadBatches();
-    } catch (err) {
+      loadBatches(page);
+    } catch {
       toast.error('Failed to reprocess batch');
     } finally {
       setReprocessing(null);
@@ -152,17 +148,14 @@ export function Batches() {
           </select>
 
           <button
-            onClick={() => loadBatches(false)}
-            className="px-3 py-2 border border-gray-200 rounded hover:bg-gray-50"
+            onClick={() => loadBatches(page)}
+            disabled={isLoading}
+            className="px-3 py-2 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-50"
             aria-label="Refresh batches"
           >
-            <RefreshCw size={16} className="text-gray-600" />
+            <RefreshCw size={16} className={`text-gray-600 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
-      </div>
-
-      <div className="flex justify-between items-center text-sm text-gray-600">
-        <span>Showing {batches.length} of {totalCount} batches</span>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -171,75 +164,74 @@ export function Batches() {
         ) : batches.length === 0 ? (
           <div className="p-8 text-center text-gray-500">No batches found</div>
         ) : (
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <th
-                      key={header.id}
-                      className="px-4 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer select-none"
-                      onClick={header.column.getToggleSortingHandler()}
-                    >
-                      <div className="flex items-center gap-1">
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                        {header.column.getIsSorted() === 'asc' && (
-                          <ChevronUp size={14} />
-                        )}
-                        {header.column.getIsSorted() === 'desc' && (
-                          <ChevronDown size={14} />
-                        )}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {table.getRowModel().rows.map((row) => (
-                <Fragment key={row.id}>
-                  <tr className="hover:bg-gray-50">
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-4 py-3">
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
-                      </td>
+          <>
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <tr key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <th
+                        key={header.id}
+                        className="px-4 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer select-none"
+                        onClick={header.column.getToggleSortingHandler()}
+                      >
+                        <div className="flex items-center gap-1">
+                          {flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                          {header.column.getIsSorted() === 'asc' && (
+                            <ChevronUp size={14} />
+                          )}
+                          {header.column.getIsSorted() === 'desc' && (
+                            <ChevronDown size={14} />
+                          )}
+                        </div>
+                      </th>
                     ))}
                   </tr>
-                  {expanded[row.id] && (
-                    <tr>
-                      <td colSpan={columns.length} className="p-0">
-                        {row.original.error_message && (
-                          <div className="px-8 py-3 bg-red-50 text-sm text-red-700">
-                            <strong>Error:</strong> {row.original.error_message}
-                          </div>
-                        )}
-                        <BatchDetailsPanel
-                          batchId={row.original.id}
-                        />
-                      </td>
+                ))}
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {table.getRowModel().rows.map((row) => (
+                  <Fragment key={row.id}>
+                    <tr className="hover:bg-gray-50">
+                      {row.getVisibleCells().map((cell) => (
+                        <td key={cell.id} className="px-4 py-3">
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
+                        </td>
+                      ))}
                     </tr>
-                  )}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {nextCursor && !isLoading && (
-          <div className="p-4 border-t border-gray-100 text-center">
-            <button
-              onClick={loadMore}
-              disabled={isLoadingMore}
-              className="px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600 disabled:opacity-50"
-            >
-              {isLoadingMore ? 'Loading...' : `Load More (${totalCount - batches.length} remaining)`}
-            </button>
-          </div>
+                    {expanded[row.id] && (
+                      <tr>
+                        <td colSpan={columns.length} className="p-0">
+                          {row.original.error_message && (
+                            <div className="px-8 py-3 bg-red-50 text-sm text-red-700">
+                              <strong>Error:</strong> {row.original.error_message}
+                            </div>
+                          )}
+                          <BatchDetailsPanel
+                            batchId={row.original.id}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              limit={PAGE_SIZE}
+              onPageChange={handlePageChange}
+              isLoading={isLoading}
+            />
+          </>
         )}
       </div>
     </div>
