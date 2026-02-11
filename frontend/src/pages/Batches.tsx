@@ -27,9 +27,12 @@ export function Batches() {
   const [batches, setBatches] = useState<BatchRow[]>([]);
   const [stores, setStores] = useState<StoreData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [reprocessing, setReprocessing] = useState<number | null>(null);
+  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
 
   const [filters, setFilters] = useState({
     storeNumber: '',
@@ -46,16 +49,39 @@ export function Batches() {
     loadStores();
   }, []);
 
-  const loadBatches = () => {
-    setIsLoading(true);
-    fetchBatches(filters.storeNumber || filters.status ? filters : undefined)
-      .then((data) => setBatches(data as BatchRow[]))
+  const loadBatches = (append = false, cursor?: number) => {
+    if (append) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+    }
+    const params = {
+      ...(filters.storeNumber || filters.status ? filters : {}),
+      cursor,
+      limit: 100,
+    };
+    fetchBatches(params)
+      .then((response) => {
+        const newBatches = response.data as BatchRow[];
+        setBatches((prev) => (append ? [...prev, ...newBatches] : newBatches));
+        setNextCursor(response.nextCursor);
+        setTotalCount(response.totalCount);
+      })
       .catch(() => toast.error('Failed to load batches'))
-      .finally(() => setIsLoading(false));
+      .finally(() => {
+        setIsLoading(false);
+        setIsLoadingMore(false);
+      });
+  };
+
+  const loadMore = () => {
+    if (nextCursor) {
+      loadBatches(true, nextCursor);
+    }
   };
 
   useEffect(() => {
-    loadBatches();
+    loadBatches(false);
   }, [filters]);
 
   const handleReprocess = async (batchId: number) => {
@@ -126,13 +152,17 @@ export function Batches() {
           </select>
 
           <button
-            onClick={loadBatches}
+            onClick={() => loadBatches(false)}
             className="px-3 py-2 border border-gray-200 rounded hover:bg-gray-50"
             aria-label="Refresh batches"
           >
             <RefreshCw size={16} className="text-gray-600" />
           </button>
         </div>
+      </div>
+
+      <div className="flex justify-between items-center text-sm text-gray-600">
+        <span>Showing {batches.length} of {totalCount} batches</span>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -199,6 +229,17 @@ export function Batches() {
               ))}
             </tbody>
           </table>
+        )}
+        {nextCursor && !isLoading && (
+          <div className="p-4 border-t border-gray-100 text-center">
+            <button
+              onClick={loadMore}
+              disabled={isLoadingMore}
+              className="px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600 disabled:opacity-50"
+            >
+              {isLoadingMore ? 'Loading...' : `Load More (${totalCount - batches.length} remaining)`}
+            </button>
+          </div>
         )}
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-const DEFAULT_PAGE_SIZE = 50;
-const MAX_PAGE_SIZE = 200;
+const DEFAULT_PAGE_SIZE = 100;
+const MAX_PAGE_SIZE = 500;
 
 export const cursorPaginationSchema = z.object({
   cursor: z

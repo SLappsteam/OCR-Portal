@@ -22,8 +22,11 @@ export function Documents() {
   const [stores, setStores] = useState<{ store_number: string }[]>([]);
   const [docTypes, setDocTypes] = useState<{ code: string; name: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [fieldFilters, setFieldFilters] = useState<FieldFilter[]>([]);
+  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
 
   const [filters, setFilters] = useState({
     storeNumber: '',
@@ -53,8 +56,12 @@ export function Documents() {
       .catch(() => toast.error('Failed to load filter options'));
   }, []);
 
-  useEffect(() => {
-    setIsLoading(true);
+  const loadDocuments = (append = false, cursor?: number) => {
+    if (append) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+    }
 
     if (filters.search) {
       searchPages({
@@ -63,19 +70,46 @@ export function Documents() {
         documentType: filters.documentType || undefined,
         filters: fieldFilters.length > 0 ? fieldFilters : undefined,
       })
-        .then(setPageResults)
+        .then((results) => {
+          setPageResults(results);
+          setNextCursor(null);
+          setTotalCount(results.length);
+        })
         .catch(() => toast.error('Failed to search pages'))
-        .finally(() => setIsLoading(false));
+        .finally(() => {
+          setIsLoading(false);
+          setIsLoadingMore(false);
+        });
     } else {
       fetchDocuments({
         storeNumber: filters.storeNumber || undefined,
         documentType: filters.documentType || undefined,
         excludeCoversheets: filters.excludeCoversheets,
+        cursor,
+        limit: 100,
       })
-        .then((data) => setDocuments(data as DocumentRow[]))
+        .then((response) => {
+          const newDocs = response.data as DocumentRow[];
+          setDocuments((prev) => (append ? [...prev, ...newDocs] : newDocs));
+          setNextCursor(response.nextCursor);
+          setTotalCount(response.totalCount);
+        })
         .catch(() => toast.error('Failed to load documents'))
-        .finally(() => setIsLoading(false));
+        .finally(() => {
+          setIsLoading(false);
+          setIsLoadingMore(false);
+        });
     }
+  };
+
+  const loadMore = () => {
+    if (nextCursor) {
+      loadDocuments(true, nextCursor);
+    }
+  };
+
+  useEffect(() => {
+    loadDocuments(false);
   }, [filters, fieldFilters]);
 
   const handleDocumentClick = (batchId: number, pageNumber: number) => {
@@ -125,6 +159,12 @@ export function Documents() {
         }}
       />
 
+      <div className="flex justify-between items-center text-sm text-gray-600">
+        <span>
+          Showing {isSearchMode ? pageResults.length : documents.length} of {totalCount} {isSearchMode ? 'results' : 'documents'}
+        </span>
+      </div>
+
       <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
         {isLoading ? (
           <div className="p-8 text-center text-gray-500">Loading...</div>
@@ -142,6 +182,17 @@ export function Documents() {
             onSortingChange={setSorting}
             onDocumentClick={handleDocumentClick}
           />
+        )}
+        {nextCursor && !isLoading && !isSearchMode && (
+          <div className="p-4 border-t border-gray-100 text-center">
+            <button
+              onClick={loadMore}
+              disabled={isLoadingMore}
+              className="px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600 disabled:opacity-50"
+            >
+              {isLoadingMore ? 'Loading...' : `Load More (${totalCount - documents.length} remaining)`}
+            </button>
+          </div>
         )}
       </div>
     </div>

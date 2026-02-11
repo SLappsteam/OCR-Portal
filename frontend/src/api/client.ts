@@ -138,27 +138,38 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
   return response.data;
 }
 
+export interface CursorPaginatedResponse<T> {
+  success: boolean;
+  data: T[];
+  nextCursor: number | null;
+  totalCount: number;
+}
+
 export async function fetchDocuments(params?: {
   storeNumber?: string;
   documentType?: string;
   startDate?: string;
   endDate?: string;
   excludeCoversheets?: boolean;
-}) {
+  cursor?: number;
+  limit?: number;
+}): Promise<CursorPaginatedResponse<unknown>> {
   const searchParams = new URLSearchParams();
   if (params?.storeNumber) searchParams.set('storeNumber', params.storeNumber);
   if (params?.documentType) searchParams.set('documentType', params.documentType);
   if (params?.startDate) searchParams.set('startDate', params.startDate);
   if (params?.endDate) searchParams.set('endDate', params.endDate);
   if (params?.excludeCoversheets) searchParams.set('excludeCoversheets', 'true');
+  if (params?.cursor) searchParams.set('cursor', params.cursor.toString());
+  searchParams.set('limit', (params?.limit ?? 100).toString());
 
   const query = searchParams.toString();
   const endpoint = `/api/documents${query ? `?${query}` : ''}`;
-  const response = await apiClient.get<ApiResponse<unknown[]>>(endpoint);
+  const response = await apiClient.get<CursorPaginatedResponse<unknown>>(endpoint);
   if (!response.success) {
-    throw new Error(response.error ?? 'Failed to fetch documents');
+    throw new Error('Failed to fetch documents');
   }
-  return response.data ?? [];
+  return response;
 }
 
 export async function searchPages(params: {
@@ -219,18 +230,22 @@ export async function updateDocument(id: number, data: { documentTypeId?: number
 export async function fetchBatches(params?: {
   storeNumber?: string;
   status?: string;
-}) {
+  cursor?: number;
+  limit?: number;
+}): Promise<CursorPaginatedResponse<unknown>> {
   const searchParams = new URLSearchParams();
   if (params?.storeNumber) searchParams.set('storeNumber', params.storeNumber);
   if (params?.status) searchParams.set('status', params.status);
+  if (params?.cursor) searchParams.set('cursor', params.cursor.toString());
+  searchParams.set('limit', (params?.limit ?? 100).toString());
 
   const query = searchParams.toString();
   const endpoint = `/api/batches${query ? `?${query}` : ''}`;
-  const response = await apiClient.get<ApiResponse<unknown[]>>(endpoint);
+  const response = await apiClient.get<CursorPaginatedResponse<unknown>>(endpoint);
   if (!response.success) {
-    throw new Error(response.error ?? 'Failed to fetch batches');
+    throw new Error('Failed to fetch batches');
   }
-  return response.data ?? [];
+  return response;
 }
 
 export async function fetchBatch(id: number) {
