@@ -184,7 +184,7 @@ export function DocumentsTable({
         accessorKey: 'created_at',
         header: 'Scanned Date',
         cell: ({ row }) =>
-          format(new Date(row.original.created_at), 'MMM d, yyyy'),
+          format(new Date(row.original.created_at), 'MMM d, yyyy h:mm a'),
       },
     ],
     []
