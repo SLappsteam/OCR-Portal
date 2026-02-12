@@ -11,8 +11,8 @@ A document processing system for managing store documents with OCR capabilities.
 ## Prerequisites
 
 - Node.js 18+
-- Docker and Docker Compose
-- npm or yarn
+- PostgreSQL (via Docker or standalone)
+- npm
 
 ## Getting Started
 
@@ -75,11 +75,13 @@ The frontend will be available at `http://localhost:5173`.
 
 /frontend
   /src
-    /components/      # Reusable UI components
-    /pages/           # Page components
-    /hooks/           # Custom React hooks
     /api/             # API client
+    /components/      # Reusable UI components
+    /contexts/        # React context providers
+    /hooks/           # Custom React hooks
+    /pages/           # Page components
     /types/           # TypeScript types
+    /utils/           # Helpers and utilities
 ```
 
 ## Available Scripts
@@ -114,11 +116,14 @@ The backend uses port-based detection to manage server instances:
 
 The system uses PostgreSQL with Prisma ORM. Key models:
 
+- **app_settings** - Application configuration
 - **document_types** - Document classification codes
 - **stores** - Store locations
 - **batches** - Original TIFF files with processing status
 - **documents** - Logical documents within batches
+- **page_extractions** - OCR and barcode data extracted from pages
 - **users** - User accounts
+- **refresh_tokens** - JWT refresh token tracking
 - **user_store_access** - Store-level permissions
 
 ## License
