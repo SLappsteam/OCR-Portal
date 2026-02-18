@@ -1,4 +1,11 @@
 node_modules/
 dist/
-.env
 *.log
+
+# Active env (may contain real URLs)
+.env
+
+# Keep env templates tracked
+!.env.development
+!.env.qa
+!.env.production

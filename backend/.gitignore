@@ -1,6 +1,20 @@
 node_modules/
 dist/
 logs/
-.env
 *.log
 server.lock
+
+# Active env (contains real secrets)
+.env
+
+# Keep env templates tracked
+!.env.development
+!.env.qa
+!.env.production
+
+# Runtime data
+storage/
+watch/
+debug_*.png
+_tmp_*
+nul

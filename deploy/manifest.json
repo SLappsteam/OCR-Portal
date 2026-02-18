@@ -1,0 +1,75 @@
+{
+  "app": {
+    "id": "ocr-portal",
+    "name": "OCR Portal",
+    "description": "Slumberland Document Processing System with OCR",
+    "type": "node-fullstack",
+    "version": "1.0.0"
+  },
+  "components": {
+    "backend": {
+      "path": "backend",
+      "entryPoint": "dist/index.js",
+      "port": 3000,
+      "healthCheck": {
+        "endpoint": "/health",
+        "expectedStatus": 200,
+        "timeoutSeconds": 30
+      },
+      "processManager": "pm2",
+      "pm2Name": "ocr-portal-backend",
+      "buildCommands": [
+        "npm ci --production=false",
+        "npx prisma generate",
+        "npm run build"
+      ],
+      "startCommand": "npm start",
+      "stopCommand": "npm run stop"
+    },
+    "frontend": {
+      "path": "frontend",
+      "servePath": "dist",
+      "buildCommands": [
+        "npm ci --production=false",
+        "npm run build"
+      ]
+    }
+  },
+  "dependencies": {
+    "runtime": {
+      "node": ">=18.0.0",
+      "postgresql": ">=15"
+    },
+    "systemEnvVars": [
+      {
+        "name": "ENVIRONMENT",
+        "values": ["development", "qa", "production"],
+        "description": "Controls which .env.{ENVIRONMENT} config file is loaded"
+      }
+    ],
+    "database": {
+      "type": "postgresql",
+      "port": 5432,
+      "migrateCommand": "npx prisma db push",
+      "seedCommand": "npx prisma db seed"
+    },
+    "fileStorage": [
+      { "envVar": "WATCH_FOLDER_PATH", "default": "./backend/watch", "description": "TIFF file intake — monitored by chokidar watcher" },
+      { "envVar": "TIFF_STORAGE_PATH", "default": "./backend/storage/tiffs", "description": "Processed TIFF long-term storage" },
+      { "envVar": "ARCHIVE_FOLDER_PATH", "default": "./backend/storage/archive", "description": "Archived source files after ingestion" }
+    ],
+    "externalServices": [
+      { "name": "Microsoft Entra ID", "type": "oidc", "optional": true, "configLocation": "app_settings table or ENTRA_CLIENT_SECRET env var" },
+      { "name": "Microsoft Graph API", "type": "rest", "optional": true, "url": "https://graph.microsoft.com/v1.0/me" }
+    ]
+  },
+  "deployment": {
+    "deployPath": "E:\\OCR-Portal",
+    "backupPath": "E:\\OCR-Portal-backups",
+    "environments": {
+      "development": { "serverIp": "172.16.20.203", "backendUrl": "http://172.16.20.203:3000" },
+      "qa": { "serverIp": "172.16.20.203", "backendUrl": "http://172.16.20.203:3000" },
+      "production": { "serverIp": "<PROD_IP>", "backendUrl": "http://<PROD_IP>:3000" }
+    }
+  }
+}

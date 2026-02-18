@@ -1,0 +1,43 @@
+node_modules/
+dist/
+logs/
+*.log
+
+# Active env files (contain real secrets)
+.env
+backend/.env
+frontend/.env
+
+# Keep templates tracked (they have placeholders, not secrets)
+# !backend/.env.development
+# !backend/.env.qa
+# !backend/.env.production
+# !frontend/.env.development
+# !frontend/.env.qa
+# !frontend/.env.production
+
+# Storage data (runtime data, not deployable)
+backend/storage/
+backend/watch/
+
+# Build artifacts
+backend/dist/
+frontend/dist/
+
+# Debug images
+backend/debug_*.png
+
+# Lock files
+server.lock
+
+# OS files
+Thumbs.db
+Desktop.ini
+
+# Backups (stored outside repo but just in case)
+*-backups/
+
+# Temporary files
+backend/nul
+nul
+backend/_tmp_*

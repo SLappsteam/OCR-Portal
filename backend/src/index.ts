@@ -16,7 +16,11 @@ import { disconnectPrisma } from './utils/prisma';
 import { validateAuthEnvironment } from './utils/authConstants';
 import cookieParser from 'cookie-parser';
 
-dotenv.config();
+const ENVIRONMENT = process.env['ENVIRONMENT'] ?? 'development';
+dotenv.config({ path: `.env.${ENVIRONMENT}` });
+dotenv.config(); // fallback: fills any vars not set by the environment-specific file
+
+console.log(`[startup] ENVIRONMENT=${ENVIRONMENT}, NODE_ENV=${process.env['NODE_ENV'] ?? 'undefined'}`);
 validateAuthEnvironment();
 
 acquireLock();
