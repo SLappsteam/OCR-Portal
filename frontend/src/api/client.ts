@@ -310,10 +310,12 @@ export async function fetchBatches(params?: {
   startDate?: string;
   endDate?: string;
   search?: string;
+  issues?: boolean;
   page?: number;
   limit?: number;
 }): Promise<PaginatedResponse<unknown>> {
   const searchParams = new URLSearchParams();
+  if (params?.issues) searchParams.set('issues', 'true');
   if (params?.storeNumber) searchParams.set('storeNumber', params.storeNumber);
   if (params?.status) searchParams.set('status', params.status);
   if (params?.batchType) searchParams.set('batchType', params.batchType);

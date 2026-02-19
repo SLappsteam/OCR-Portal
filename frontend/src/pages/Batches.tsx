@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Search,
   X,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { fetchBatches, fetchStores, reprocessBatch } from '../api/client';
@@ -62,6 +63,7 @@ export function Batches() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [reprocessing, setReprocessing] = useState<number | null>(null);
+  const [issuesMode, setIssuesMode] = useState(() => searchParams.get('issues') === 'true');
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -92,7 +94,7 @@ export function Batches() {
     return () => clearTimeout(searchTimer.current);
   }, []);
 
-  const hasActiveFilters = filters.storeNumber || filters.status || filters.batchType
+  const hasActiveFilters = issuesMode || filters.storeNumber || filters.status || filters.batchType
     || filters.startDate || filters.endDate || filters.search;
 
   // Clear URL query params after reading them into state
@@ -108,9 +110,10 @@ export function Batches() {
       .catch(() => toast.error('Failed to load stores'));
   }, []);
 
-  const loadBatches = useCallback((targetPage: number, currentFilters: BatchFilters, search: string) => {
+  const loadBatches = useCallback((targetPage: number, currentFilters: BatchFilters, search: string, issues: boolean) => {
     setIsLoading(true);
     fetchBatches({
+      issues: issues || undefined,
       storeNumber: currentFilters.storeNumber || undefined,
       status: currentFilters.status || undefined,
       batchType: currentFilters.batchType || undefined,
@@ -133,18 +136,18 @@ export function Batches() {
   // Reload when dropdown filters change (immediate)
   useEffect(() => {
     setPage(1);
-    loadBatches(1, filters, debouncedSearch);
-  }, [filters.storeNumber, filters.status, filters.batchType, filters.startDate, filters.endDate, debouncedSearch, loadBatches]);
+    loadBatches(1, filters, debouncedSearch, issuesMode);
+  }, [filters.storeNumber, filters.status, filters.batchType, filters.startDate, filters.endDate, debouncedSearch, issuesMode, loadBatches]);
 
   const handlePageChange = (newPage: number) => {
-    loadBatches(newPage, filters, debouncedSearch);
+    loadBatches(newPage, filters, debouncedSearch, issuesMode);
   };
 
   const handleReprocess = async (batchId: number) => {
     setReprocessing(batchId);
     try {
       await reprocessBatch(batchId);
-      loadBatches(page, filters, debouncedSearch);
+      loadBatches(page, filters, debouncedSearch, issuesMode);
     } catch {
       toast.error('Failed to reprocess batch');
     } finally {
@@ -153,6 +156,7 @@ export function Batches() {
   };
 
   const clearFilters = () => {
+    setIssuesMode(false);
     setFilters({
       storeNumber: '',
       status: '',
@@ -187,6 +191,19 @@ export function Batches() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold text-gray-900">Batches</h1>
+
+      {issuesMode && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          <AlertCircle size={16} />
+          <span>Showing batches with issues: <strong>Unclassified</strong>, <strong>Failed</strong>, or <strong>Unassigned store</strong></span>
+          <button
+            onClick={() => setIssuesMode(false)}
+            className="ml-auto text-amber-600 hover:text-amber-800"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-lg p-4">
         <div className="flex flex-wrap gap-3">
@@ -265,7 +282,7 @@ export function Batches() {
           />
 
           <button
-            onClick={() => loadBatches(page, filters, debouncedSearch)}
+            onClick={() => loadBatches(page, filters, debouncedSearch, issuesMode)}
             disabled={isLoading}
             className="px-3 py-2 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-50"
             aria-label="Refresh batches"

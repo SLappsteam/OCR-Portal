@@ -25,6 +25,7 @@ const querySchema = z.object({
   endDate: z.string().optional(),
   search: z.string().optional(),
   parentOnly: z.string().optional(),
+  issues: z.string().optional(),
 }).merge(offsetPaginationSchema);
 
 const updateBatchSchema = z.object({
@@ -38,8 +39,45 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       throw new BadRequestError('Invalid query parameters');
     }
 
-    const { storeNumber, status, batchType, startDate, endDate, search, parentOnly, page, limit } = parsed.data;
+    const { storeNumber, status, batchType, startDate, endDate, search, parentOnly, issues, page, limit } = parsed.data;
     const storeScope = buildStoreWhereClause(req.accessibleStoreIds);
+
+    // Issues mode: OR across unclassified type, failed status, and unassigned store
+    if (issues === 'true') {
+      const where: Record<string, unknown> = {
+        ...storeScope,
+        OR: [
+          { batch_type: 'UNCLASSIFIED' },
+          { status: 'failed' },
+          { store: { store_number: 'UNASSIGNED' } },
+        ],
+      };
+
+      const [batches, totalCount] = await Promise.all([
+        prisma.batch.findMany({
+          where,
+          include: {
+            store: true,
+            _count: { select: { documents: true, childBatches: true } },
+          },
+          orderBy: { id: 'desc' },
+          skip: calculateSkip(page, limit),
+          take: limit,
+        }),
+        prisma.batch.count({ where }),
+      ]);
+
+      const serialized = batches.map((b) => serializeBigIntFields(b as Record<string, unknown>));
+      const response: OffsetPaginatedResponse = {
+        success: true,
+        data: serialized,
+        page,
+        limit,
+        totalCount,
+        totalPages: calculateTotalPages(totalCount, limit),
+      };
+      return res.json(response);
+    }
 
     const where: Record<string, unknown> = {
       ...storeScope,

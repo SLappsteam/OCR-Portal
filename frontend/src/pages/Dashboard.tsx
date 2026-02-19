@@ -114,7 +114,7 @@ export function Dashboard() {
               value={stats.issueCount}
               icon={<AlertCircle className={stats.issueCount > 0 ? 'text-red-500' : 'text-gray-600'} size={20} />}
               color={stats.issueCount > 0 ? 'bg-red-50' : 'bg-gray-100'}
-              to="/batches?status=failed"
+              to="/batches?issues=true"
             />
             <StatCard
               title="Active Stores"
