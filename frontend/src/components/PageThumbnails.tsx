@@ -41,19 +41,20 @@ export function PageThumbnails({
     >
       <div className="p-2 space-y-2">
         {Array.from({ length: pageCount }, (_, i) => {
-          const doc = documentsByPage.get(i);
-          const isSelected = i === currentPage;
+          const pageNum = i + 1;
+          const doc = documentsByPage.get(pageNum);
+          const isSelected = pageNum === currentPage;
           return (
             <div
-              key={i}
+              key={pageNum}
               ref={isSelected ? selectedRef : null}
               role="button"
               tabIndex={0}
-              onClick={() => onPageSelect(i)}
+              onClick={() => onPageSelect(pageNum)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  onPageSelect(i);
+                  onPageSelect(pageNum);
                 }
               }}
               className={`cursor-pointer rounded border-2 transition-all ${
@@ -64,8 +65,8 @@ export function PageThumbnails({
             >
               <div className="relative aspect-[8.5/11] bg-gray-100">
                 <img
-                  src={getBatchPreviewUrl(batchId, i)}
-                  alt={`Page ${i}`}
+                  src={getBatchPreviewUrl(batchId, pageNum)}
+                  alt={`Page ${pageNum}`}
                   className="w-full h-full object-contain rounded-t"
                   loading="lazy"
                 />
@@ -76,7 +77,7 @@ export function PageThumbnails({
               <div className={`text-xs text-center py-1 ${
                 isSelected ? 'bg-primary-50 font-medium' : 'bg-gray-50'
               }`}>
-                p.{i}
+                p.{pageNum}
                 {doc?.documentType && (
                   <span className="block text-[10px] text-gray-500 truncate px-1">
                     {doc.documentType.code}

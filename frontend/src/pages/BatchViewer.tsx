@@ -11,7 +11,7 @@ export function BatchViewer() {
   const { id } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const [batch, setBatch] = useState<BatchData | null>(null);
-  const [currentPage, setCurrentPage] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,7 +28,7 @@ export function BatchViewer() {
 
     setIsLoading(true);
     setBatch(null);
-    setCurrentPage(0);
+    setCurrentPage(1);
     setError(null);
 
     fetchBatchDocuments(batchId)
@@ -43,14 +43,14 @@ export function BatchViewer() {
     const pageParam = searchParams.get('page');
     if (!pageParam) return;
     const page = parseInt(pageParam, 10);
-    if (!isNaN(page) && page >= 0 && page < batch.page_count) {
+    if (!isNaN(page) && page >= 1 && page <= batch.page_count) {
       setCurrentPage(page);
     }
   }, [batch, searchParams]);
 
   const goToPage = (page: number) => {
     if (!batch) return;
-    const newPage = Math.max(0, Math.min(page, batch.page_count - 1));
+    const newPage = Math.max(1, Math.min(page, batch.page_count));
     setCurrentPage(newPage);
     setSearchParams({ page: String(newPage) });
     resetView();

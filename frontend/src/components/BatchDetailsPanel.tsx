@@ -65,7 +65,7 @@ export function BatchDetailsPanel({ batchId }: Props) {
     details.documents.map((d) => [d.page_number, d])
   );
   const missingPages: number[] = [];
-  for (let i = 0; i < details.page_count; i++) {
+  for (let i = 1; i <= details.page_count; i++) {
     if (!documentsByPage.has(i)) {
       missingPages.push(i);
     }
@@ -144,18 +144,19 @@ export function BatchDetailsPanel({ batchId }: Props) {
           </thead>
           <tbody className="divide-y">
             {Array.from({ length: details.page_count }, (_, i) => {
-              const doc = documentsByPage.get(i);
+              const pageNum = i + 1;
+              const doc = documentsByPage.get(pageNum);
               const hasDoc = !!doc;
               return (
                 <tr
-                  key={i}
+                  key={pageNum}
                   role="button"
                   tabIndex={0}
-                  onClick={() => navigate(`/batches/${batchId}?page=${i}`)}
+                  onClick={() => navigate(`/batches/${batchId}?page=${pageNum}`)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      navigate(`/batches/${batchId}?page=${i}`);
+                      navigate(`/batches/${batchId}?page=${pageNum}`);
                     }
                   }}
                   className={`hover:bg-gray-50 cursor-pointer ${
@@ -163,7 +164,7 @@ export function BatchDetailsPanel({ batchId }: Props) {
                   }`}
                 >
                   <td className="px-3 py-2 font-medium">
-                    p.{i}
+                    p.{pageNum}
                   </td>
                   <td className="px-3 py-2">
                     {doc?.documentType?.name ?? (

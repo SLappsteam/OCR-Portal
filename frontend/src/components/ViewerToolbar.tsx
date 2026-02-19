@@ -29,7 +29,7 @@ export function ViewerToolbar({
   return (
     <div className="flex items-center gap-2 p-2 border-b bg-gray-50 flex-wrap">
       <span className="text-sm font-medium">
-        Page {currentPage} of {totalPages - 1}
+        Page {currentPage} of {totalPages}
       </span>
 
       <div className="w-px h-5 bg-gray-300 mx-1" />

@@ -25,14 +25,15 @@ export async function extractPageAsPng(
 ): Promise<Buffer> {
   try {
     const totalPages = await getTiffPageCount(filePath);
+    const pageIndex = pageNumber - 1;
 
-    if (pageNumber < 0 || pageNumber >= totalPages) {
+    if (pageIndex < 0 || pageIndex >= totalPages) {
       throw new Error(
-        `Page ${pageNumber} out of range (0-${totalPages - 1})`
+        `Page ${pageNumber} out of range (1-${totalPages})`
       );
     }
 
-    return sharp(filePath, { page: pageNumber })
+    return sharp(filePath, { page: pageIndex })
       .png()
       .toBuffer();
   } catch (error) {

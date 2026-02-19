@@ -28,7 +28,7 @@ async function scanAllPages(
   for (let i = 0; i < pageCount; i += PAGE_CONCURRENCY) {
     const batch = Array.from(
       { length: Math.min(PAGE_CONCURRENCY, pageCount - i) },
-      (_, j) => i + j
+      (_, j) => i + j + 1
     );
     const batchResults = await Promise.all(
       batch.map((page) => scanPageForBarcode(filePath, page))
@@ -89,24 +89,25 @@ function buildBatchSections(
 
   for (let page = 0; page < pageCount; page++) {
     const rawBarcode = pageResults[page];
+    const pageNum = page + 1;
 
     if (rawBarcode) {
       const normalizedCode = normalizeBarcode(rawBarcode);
       current = handleBarcodePage(
-        page, rawBarcode, normalizedCode, current, sections
+        pageNum, rawBarcode, normalizedCode, current, sections
       );
     } else if (page === 0 && !current) {
       current = {
         documentTypeCode: UNCLASSIFIED_CODE,
-        pages: [0],
+        pages: [1],
         barcodeRaw: '',
       };
-      logger.info('  Page 0: no barcode, starting as UNCLASSIFIED');
+      logger.info('  Page 1: no barcode, starting as UNCLASSIFIED');
     } else if (current) {
-      current.pages.push(page);
-      logger.info(`  Page ${page}: no barcode (continuation)`);
+      current.pages.push(pageNum);
+      logger.info(`  Page ${pageNum}: no barcode (continuation)`);
     } else {
-      logger.info(`  Page ${page}: no barcode (continuation)`);
+      logger.info(`  Page ${pageNum}: no barcode (continuation)`);
     }
   }
 

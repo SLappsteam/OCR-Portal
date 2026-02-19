@@ -39,7 +39,7 @@ router.get(
       const batchId = parseInt(req.params['batchId'] ?? '', 10);
       const pageNumber = parseInt(req.params['pageNumber'] ?? '', 10);
 
-      if (isNaN(batchId) || isNaN(pageNumber) || pageNumber < 0) {
+      if (isNaN(batchId) || isNaN(pageNumber) || pageNumber < 1) {
         throw new BadRequestError('Invalid batch ID or page number');
       }
 
@@ -52,7 +52,7 @@ router.get(
         throw new NotFoundError('Batch not found');
       }
 
-      if (batch.page_count !== null && pageNumber >= batch.page_count) {
+      if (batch.page_count !== null && pageNumber > batch.page_count) {
         throw new BadRequestError(`Page ${pageNumber} exceeds batch page count (${batch.page_count})`);
       }
 
@@ -76,7 +76,7 @@ router.get(
       const documentId = parseInt(req.params['documentId'] ?? '', 10);
       const pageNumber = parseInt(req.params['pageNumber'] ?? '', 10);
 
-      if (isNaN(documentId) || isNaN(pageNumber) || pageNumber < 0) {
+      if (isNaN(documentId) || isNaN(pageNumber) || pageNumber < 1) {
         throw new BadRequestError('Invalid document ID or page number');
       }
 
