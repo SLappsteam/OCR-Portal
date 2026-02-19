@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { Plus, Store as StoreIcon } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -102,9 +103,12 @@ export function Stores() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <StoreIcon size={16} className="text-gray-400" />
-                      <span className="font-medium">
+                      <Link
+                        to={`/documents?store=${store.store_number}`}
+                        className="font-medium text-blue-600 hover:underline"
+                      >
                         Store {store.store_number}
-                      </span>
+                      </Link>
                     </div>
                   </td>
                   <td className="px-4 py-3">{store.name}</td>

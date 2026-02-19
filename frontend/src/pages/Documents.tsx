@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { type SortingState } from '@tanstack/react-table';
 import { toast } from 'react-toastify';
 import {
@@ -20,6 +20,7 @@ const PAGE_SIZE = 100;
 
 export function Documents() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [pageResults, setPageResults] = useState<PageSearchResult[]>([]);
   const [stores, setStores] = useState<{ store_number: string }[]>([]);
@@ -44,6 +45,15 @@ export function Documents() {
   } = useDocumentFilters();
 
   const isInitialMount = useRef(true);
+
+  // Apply store filter from URL query param (e.g. /documents?store=54)
+  useEffect(() => {
+    const storeParam = searchParams.get('store');
+    if (storeParam) {
+      setFilters((f) => ({ ...f, storeNumber: storeParam }));
+      navigate('/documents', { replace: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     Promise.all([fetchStores(), fetchDocumentTypes()])
