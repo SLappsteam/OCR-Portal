@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Fragment } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   useReactTable,
   getCoreRowModel,
@@ -27,6 +28,8 @@ interface StoreData {
 const PAGE_SIZE = 100;
 
 export function Batches() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [batches, setBatches] = useState<BatchRow[]>([]);
   const [stores, setStores] = useState<StoreData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,6 +45,15 @@ export function Batches() {
     storeNumber: '',
     status: '',
   });
+
+  // Apply status filter from URL query param (e.g. /batches?status=failed)
+  useEffect(() => {
+    const statusParam = searchParams.get('status');
+    if (statusParam) {
+      setFilters((f) => ({ ...f, status: statusParam }));
+      navigate('/batches', { replace: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadStores = () => {
     fetchStores()

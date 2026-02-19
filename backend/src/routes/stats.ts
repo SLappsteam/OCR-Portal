@@ -5,6 +5,18 @@ import { buildStoreWhereClause } from '../utils/storeFilter';
 
 const router = Router();
 
+interface DocumentTypeInfo {
+  code: string;
+  name: string;
+}
+
+interface StoreTypeRow {
+  storeNumber: string;
+  storeName: string;
+  types: Record<string, number>;
+  total: number;
+}
+
 interface DashboardStats {
   totalDocuments: number;
   totalBatches: number;
@@ -18,6 +30,8 @@ interface DashboardStats {
     status: string;
     createdAt: Date;
   }[];
+  documentsByStoreAndType: StoreTypeRow[];
+  activeDocumentTypes: DocumentTypeInfo[];
 }
 
 router.get(
@@ -77,6 +91,63 @@ router.get(
         storeDocCounts.set(storeNum, current + item._count.id);
       }
 
+      // Cross-tab query: document counts grouped by store AND document type
+      const storeFilter = storeScope
+        ? `AND b.store_id IN (${(req.accessibleStoreIds as number[]).map((id) => Number(id)).join(',')})`
+        : '';
+
+      const crossTabRows = await prisma.$queryRawUnsafe<
+        { store_number: string; store_name: string; type_code: string | null; type_name: string | null; doc_count: bigint }[]
+      >(`
+        SELECT
+          s.store_number,
+          s.name AS store_name,
+          dt.code AS type_code,
+          dt.name AS type_name,
+          COUNT(d.id)::bigint AS doc_count
+        FROM documents d
+        INNER JOIN batches b ON d.batch_id = b.id
+        INNER JOIN stores s ON b.store_id = s.id
+        LEFT JOIN document_types dt ON d.document_type_id = dt.id
+        WHERE 1=1 ${storeFilter}
+        GROUP BY s.store_number, s.name, dt.code, dt.name
+        ORDER BY s.store_number, dt.code
+      `);
+
+      // Post-process flat rows into nested StoreTypeRow[] shape
+      const storeTypeMap = new Map<string, StoreTypeRow>();
+      const activeTypeSet = new Map<string, string>();
+
+      for (const row of crossTabRows) {
+        const key = row.store_number;
+        if (!storeTypeMap.has(key)) {
+          storeTypeMap.set(key, {
+            storeNumber: row.store_number,
+            storeName: row.store_name,
+            types: {},
+            total: 0,
+          });
+        }
+        const entry = storeTypeMap.get(key)!;
+        const typeCode = row.type_code ?? 'unclassified';
+        const typeName = row.type_name ?? 'Unclassified';
+        const count = Number(row.doc_count);
+        entry.types[typeCode] = (entry.types[typeCode] ?? 0) + count;
+        entry.total += count;
+
+        if (count > 0) {
+          activeTypeSet.set(typeCode, typeName);
+        }
+      }
+
+      const documentsByStoreAndType = Array.from(storeTypeMap.values()).sort(
+        (a, b) => a.storeNumber.localeCompare(b.storeNumber, undefined, { numeric: true })
+      );
+
+      const activeDocumentTypes: DocumentTypeInfo[] = Array.from(activeTypeSet.entries())
+        .map(([code, name]) => ({ code, name }))
+        .sort((a, b) => a.code.localeCompare(b.code));
+
       const stats: DashboardStats = {
         totalDocuments,
         totalBatches,
@@ -98,6 +169,8 @@ router.get(
           status: batch.status,
           createdAt: batch.created_at,
         })),
+        documentsByStoreAndType,
+        activeDocumentTypes,
       };
 
       const response: ApiResponse<DashboardStats> = {

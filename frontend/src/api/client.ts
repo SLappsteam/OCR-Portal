@@ -30,6 +30,18 @@ export interface HealthCheckResponse {
   database: 'connected' | 'disconnected';
 }
 
+export interface DocumentTypeInfo {
+  code: string;
+  name: string;
+}
+
+export interface StoreTypeRow {
+  storeNumber: string;
+  storeName: string;
+  types: Record<string, number>;
+  total: number;
+}
+
 export interface DashboardStats {
   totalDocuments: number;
   totalBatches: number;
@@ -43,6 +55,8 @@ export interface DashboardStats {
     status: string;
     createdAt: string;
   }[];
+  documentsByStoreAndType: StoreTypeRow[];
+  activeDocumentTypes: DocumentTypeInfo[];
 }
 
 class ApiClient {

@@ -46,11 +46,16 @@ export function Documents() {
 
   const isInitialMount = useRef(true);
 
-  // Apply store filter from URL query param (e.g. /documents?store=54)
+  // Apply filters from URL query params (e.g. /documents?store=54&documentType=INV)
   useEffect(() => {
     const storeParam = searchParams.get('store');
-    if (storeParam) {
-      setFilters((f) => ({ ...f, storeNumber: storeParam }));
+    const docTypeParam = searchParams.get('documentType');
+    if (storeParam || docTypeParam) {
+      setFilters((f) => ({
+        ...f,
+        ...(storeParam ? { storeNumber: storeParam } : {}),
+        ...(docTypeParam ? { documentType: docTypeParam } : {}),
+      }));
       navigate('/documents', { replace: true });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
