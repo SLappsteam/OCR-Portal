@@ -9,6 +9,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { Breadcrumbs } from './Breadcrumbs';
 
 interface NavItem {
   path: string;
@@ -99,7 +100,10 @@ export function Layout({ children }: LayoutProps) {
       </aside>
 
       <main className="flex-1 overflow-auto bg-white">
-        <div className="p-6">{children}</div>
+        <div className="p-6">
+          <Breadcrumbs />
+          {children}
+        </div>
       </main>
     </div>
   );

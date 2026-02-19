@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, Trash2 } from 'lucide-react';
+import { Activity } from 'lucide-react';
 import { apiClient } from '../api/client';
 import type { ApiResponse } from '../types';
 import { OidcSettingsSection } from '../components/OidcSettingsSection';
@@ -12,27 +12,6 @@ export function Settings() {
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isClearing, setIsClearing] = useState(false);
-  const [clearResult, setClearResult] = useState<string | null>(null);
-
-  const handleClearData = async () => {
-    if (!confirm('This will delete ALL batches and documents. Stores and document types will be preserved. Continue?')) {
-      return;
-    }
-    setIsClearing(true);
-    setClearResult(null);
-    try {
-      const response = await apiClient.post<ApiResponse<{ documents: number; batches: number }>>('/api/settings/clear-data');
-      if (response.success && response.data) {
-        setClearResult(`Cleared ${response.data.documents} documents, ${response.data.batches} batches`);
-      }
-    } catch {
-      setClearResult('Failed to clear data');
-    } finally {
-      setIsClearing(false);
-    }
-  };
-
   useEffect(() => {
     apiClient
       .get<ApiResponse<SettingsData>>('/api/settings')
@@ -93,30 +72,6 @@ export function Settings() {
       </div>
 
       <OidcSettingsSection />
-
-      <div className="bg-white border border-gray-200 rounded-lg p-5">
-        <div className="flex items-start gap-4">
-          <div className="p-2 bg-gray-100 rounded">
-            <Trash2 size={20} className="text-gray-600" />
-          </div>
-          <div className="flex-1">
-            <h3 className="font-medium text-gray-900">Clear All Data</h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Delete all batches and documents. Stores and document types will be preserved.
-            </p>
-            <button
-              onClick={handleClearData}
-              disabled={isClearing}
-              className="mt-3 px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 disabled:opacity-50 text-sm"
-            >
-              {isClearing ? 'Clearing...' : 'Clear Data'}
-            </button>
-            {clearResult && (
-              <p className="mt-2 text-sm text-gray-600">{clearResult}</p>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

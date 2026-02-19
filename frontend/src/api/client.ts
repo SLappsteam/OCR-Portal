@@ -6,9 +6,11 @@ const API_BASE_URL = import.meta.env['VITE_API_URL'] ?? '/api';
 let accessToken: string | null = null;
 let refreshHandler: (() => Promise<boolean>) | null = null;
 let sessionExpiredHandler: (() => void) | null = null;
+let sessionExpired = false;
 
 export function setAccessToken(token: string | null): void {
   accessToken = token;
+  if (token) sessionExpired = false;
 }
 
 export function getAccessToken(): string | null {
@@ -59,6 +61,35 @@ export interface DashboardStats {
   activeDocumentTypes: DocumentTypeInfo[];
 }
 
+export interface ScorecardRow {
+  storeNumber: string;
+  storeName: string;
+  batchCount: number;
+  pageCount: number;
+  classifiedCount: number;
+  unknownCount: number;
+  missingCoversheetCount: number;
+  hasFailedBatches: boolean;
+  status: 'green' | 'yellow' | 'red';
+}
+
+export interface DailyScorecardStats {
+  date: string;
+  batchesToday: number;
+  pagesToday: number;
+  issueCount: number;
+  activeStoreCount: number;
+  batchesByStatus: { status: string; count: number }[];
+  scorecardRows: ScorecardRow[];
+  recentBatches: {
+    id: number;
+    fileName: string;
+    store: string;
+    status: string;
+    createdAt: string;
+  }[];
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -81,6 +112,10 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
+    if (sessionExpired) {
+      throw new Error('Session expired');
+    }
+
     const url = `${this.baseUrl}${endpoint}`;
     const config = this.buildConfig(options);
 
@@ -93,6 +128,7 @@ class ApiClient {
         response = await fetch(url, retryConfig);
       } else {
         accessToken = null;
+        sessionExpired = true;
         sessionExpiredHandler?.();
         throw new Error('Session expired');
       }
@@ -148,6 +184,30 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
     await apiClient.get<ApiResponse<DashboardStats>>('/api/stats/dashboard');
   if (!response.success || !response.data) {
     throw new Error(response.error ?? 'Failed to fetch dashboard stats');
+  }
+  return response.data;
+}
+
+export async function fetchDailyScorecard(date: string): Promise<DailyScorecardStats> {
+  const response = await apiClient.get<ApiResponse<DailyScorecardStats>>(
+    `/api/stats/daily-scorecard?date=${encodeURIComponent(date)}`
+  );
+  if (!response.success || !response.data) {
+    throw new Error(response.error ?? 'Failed to fetch daily scorecard');
+  }
+  return response.data;
+}
+
+export async function updateStore(
+  id: number,
+  data: { name?: string; address?: string; city?: string; state?: string }
+) {
+  const response = await apiClient.patch<ApiResponse<unknown>>(
+    `/api/stores/${id}`,
+    data
+  );
+  if (!response.success) {
+    throw new Error(response.error ?? 'Failed to update store');
   }
   return response.data;
 }
@@ -319,22 +379,15 @@ export async function fetchDocumentTypes() {
   return response.data ?? [];
 }
 
-function appendTokenParam(url: string): string {
-  const token = getAccessToken();
-  if (!token) return url;
-  const separator = url.includes('?') ? '&' : '?';
-  return `${url}${separator}token=${encodeURIComponent(token)}`;
-}
-
 export function getPreviewUrl(documentId: number, page: number): string {
-  return appendTokenParam(`${API_BASE_URL}/api/preview/${documentId}/${page}`);
+  return `${API_BASE_URL}/api/preview/${documentId}/${page}`;
 }
 
 export function getThumbnailUrl(documentId: number): string {
-  return appendTokenParam(`${API_BASE_URL}/api/preview/${documentId}/thumbnail`);
+  return `${API_BASE_URL}/api/preview/${documentId}/thumbnail`;
 }
 
 export function getBatchPreviewUrl(batchId: number, pageNumber: number): string {
-  return appendTokenParam(`${API_BASE_URL}/api/preview/batch/${batchId}/${pageNumber}`);
+  return `${API_BASE_URL}/api/preview/batch/${batchId}/${pageNumber}`;
 }
 

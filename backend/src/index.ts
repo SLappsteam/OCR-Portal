@@ -6,6 +6,7 @@ import { Server } from 'http';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { generalLimiter } from './middleware/rateLimiter';
+import { requestId } from './middleware/requestId';
 import { routes } from './routes';
 import { startWatcher, stopWatcher } from './services/watcherService';
 import { ensureStorageDirectories } from './services/storageService';
@@ -33,6 +34,7 @@ let server: Server | null = null;
 
 app.set('trust proxy', 1);
 app.use(helmet());
+app.use(requestId);
 app.use(cors({
   origin: process.env['FRONTEND_URL'] ?? 'http://localhost:5173',
   credentials: true,

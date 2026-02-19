@@ -1,17 +1,25 @@
 import winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
-import path from 'path';
 
 const LOG_DIR = process.env['LOG_DIR'] ?? 'logs';
 const LOG_LEVEL = process.env['LOG_LEVEL'] ?? 'info';
 
-const logFormat = winston.format.combine(
+// Human-readable format for console output
+const consoleFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.errors({ stack: true }),
+  winston.format.colorize(),
   winston.format.printf(({ level, message, timestamp, stack }) => {
-    const base = `${timestamp} [${level.toUpperCase()}]: ${message}`;
+    const base = `${timestamp} [${level}]: ${message}`;
     return stack ? `${base}\n${stack}` : base;
   })
+);
+
+// Structured JSON format for file transport (parseable by log aggregators)
+const jsonFormat = winston.format.combine(
+  winston.format.timestamp(),
+  winston.format.errors({ stack: true }),
+  winston.format.json()
 );
 
 const rotateTransport = new DailyRotateFile({
@@ -20,14 +28,11 @@ const rotateTransport = new DailyRotateFile({
   datePattern: 'YYYY-MM-DD',
   maxSize: '10m',
   maxFiles: 5,
-  format: logFormat,
+  format: jsonFormat,
 });
 
 const consoleTransport = new winston.transports.Console({
-  format: winston.format.combine(
-    winston.format.colorize(),
-    logFormat
-  ),
+  format: consoleFormat,
 });
 
 export const logger = winston.createLogger({

@@ -5,6 +5,7 @@ import { ApiResponse } from '../types';
 import { BadRequestError, NotFoundError } from '../middleware/errorHandler';
 import { ROLE_HIERARCHY } from '../utils/authConstants';
 import { logger } from '../utils/logger';
+import { logAuditEvent } from '../services/auditService';
 
 const router = Router();
 
@@ -98,6 +99,15 @@ router.patch(
       });
 
       logger.info(`User ${userId} store access updated`);
+      void logAuditEvent({
+        userId: req.user!.userId,
+        userEmail: req.user!.email,
+        action: 'user.update_stores',
+        resourceType: 'user',
+        resourceId: String(userId),
+        details: { stores: parsed.data.stores },
+        ipAddress: req.ip,
+      });
       res.json({ success: true, message: 'Store access updated' });
     } catch (error) {
       next(error);
@@ -132,6 +142,15 @@ router.patch(
       });
 
       logger.info(`User ${userId} role changed to ${parsed.data.role}`);
+      void logAuditEvent({
+        userId: req.user!.userId,
+        userEmail: req.user!.email,
+        action: 'user.update_role',
+        resourceType: 'user',
+        resourceId: String(userId),
+        details: { oldRole: user.role, newRole: parsed.data.role },
+        ipAddress: req.ip,
+      });
       res.json({ success: true, message: 'Role updated' });
     } catch (error) {
       next(error);

@@ -31,13 +31,23 @@ export function Login() {
 
   useEffect(() => {
     const oidcSuccess = searchParams.get('oidc');
-    const token = searchParams.get('token');
     const oidcError = searchParams.get('error');
 
-    if (oidcSuccess === 'success' && token) {
+    if (oidcSuccess === 'success') {
       setIsOidcLoading(true);
-      setAccessToken(token);
-      refreshSession()
+      // Exchange the httpOnly cookie for an access token
+      fetch(`${API_BASE_URL}/api/auth/oidc/exchange`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+        .then((res) => res.json())
+        .then((data: { success: boolean; data?: { accessToken: string }; error?: string }) => {
+          if (data.success && data.data?.accessToken) {
+            setAccessToken(data.data.accessToken);
+            return refreshSession();
+          }
+          throw new Error(data.error ?? 'Failed to exchange OIDC token');
+        })
         .catch(() => setError('Failed to complete SSO login'))
         .finally(() => {
           setIsOidcLoading(false);

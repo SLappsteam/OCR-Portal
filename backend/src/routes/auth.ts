@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../utils/prisma';
 import {
   verifyPassword,
+  verifyAccessToken,
   generateTokenPair,
   rotateRefreshToken,
   revokeAllUserTokens,
@@ -12,6 +13,7 @@ import { BadRequestError, UnauthorizedError, NotFoundError } from '../middleware
 import { REFRESH_COOKIE_NAME } from '../utils/authConstants';
 import { setRefreshCookie, clearRefreshCookie } from '../utils/cookieHelpers';
 import { logger } from '../utils/logger';
+import { logAuditEvent } from '../services/auditService';
 
 const router = Router();
 
@@ -52,6 +54,14 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
 
     setRefreshCookie(res, refreshToken);
     logger.info(`User logged in: ${user.email}`);
+    void logAuditEvent({
+      userId: user.id,
+      userEmail: user.email,
+      action: 'auth.login',
+      resourceType: 'user',
+      resourceId: String(user.id),
+      ipAddress: req.ip,
+    });
 
     res.json({
       success: true,
@@ -107,7 +117,39 @@ router.post('/logout', authenticate, async (req: Request, res: Response, next: N
     await revokeAllUserTokens(req.user!.userId);
     clearRefreshCookie(res);
     logger.info(`User logged out: ${req.user!.email}`);
+    void logAuditEvent({
+      userId: req.user!.userId,
+      userEmail: req.user!.email,
+      action: 'auth.logout',
+      resourceType: 'user',
+      resourceId: String(req.user!.userId),
+      ipAddress: req.ip,
+    });
     res.json({ success: true, data: { message: 'Logged out' } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/oidc/exchange', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.cookies?.['oidc_access'] as string | undefined;
+    if (!token) {
+      throw new UnauthorizedError('No OIDC access token');
+    }
+
+    // Verify the token is valid before handing it to the frontend
+    verifyAccessToken(token);
+
+    // Clear the one-time cookie
+    res.clearCookie('oidc_access', {
+      httpOnly: true,
+      secure: process.env['NODE_ENV'] !== 'development',
+      sameSite: 'lax',
+      path: '/',
+    });
+
+    res.json({ success: true, data: { accessToken: token } });
   } catch (error) {
     next(error);
   }

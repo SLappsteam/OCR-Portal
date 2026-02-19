@@ -59,7 +59,7 @@ router.get('/authorize', async (req: Request, res: Response) => {
 
     res.cookie(OIDC_STATE_COOKIE, encrypted, {
       httpOnly: true,
-      secure: process.env['NODE_ENV'] === 'production',
+      secure: process.env['NODE_ENV'] !== 'development',
       sameSite: 'lax',
       path: '/',
       maxAge: STATE_TTL_MS,
@@ -96,7 +96,7 @@ router.get('/callback', async (req: Request, res: Response) => {
 
     res.clearCookie(OIDC_STATE_COOKIE, {
       httpOnly: true,
-      secure: process.env['NODE_ENV'] === 'production',
+      secure: process.env['NODE_ENV'] !== 'development',
       sameSite: 'lax',
       path: '/',
     });
@@ -140,14 +140,25 @@ router.get('/callback', async (req: Request, res: Response) => {
 
     res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
       httpOnly: true,
-      secure: process.env['NODE_ENV'] === 'production',
+      secure: process.env['NODE_ENV'] !== 'development',
       sameSite: 'lax',
       path: '/',
       maxAge: REFRESH_COOKIE_MAX_AGE_MS,
     });
 
+    // Set access token in a short-lived HttpOnly cookie (30s)
+    // instead of exposing it in the URL query string.
+    const isSecure = process.env['NODE_ENV'] !== 'development';
+    res.cookie('oidc_access', accessToken, {
+      httpOnly: true,
+      secure: isSecure,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 30_000,
+    });
+
     logger.info(`OIDC login successful: ${user.email}`);
-    res.redirect(`/login?oidc=success&token=${accessToken}`);
+    res.redirect('/login?oidc=success');
   } catch (error) {
     logger.error('OIDC callback error:', error);
     res.redirect('/login?error=oidc_failed');

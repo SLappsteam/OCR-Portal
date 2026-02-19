@@ -149,6 +149,23 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+model AuditLog {
+  id            Int      @id @default(autoincrement())
+  user_id       Int?
+  user_email    String
+  action        String
+  resource_type String
+  resource_id   String?
+  details       Json?
+  ip_address    String?
+  created_at    DateTime @default(now())
+
+  @@index([user_id])
+  @@index([action])
+  @@index([created_at])
+  @@map("audit_logs")
+}
+
 model UserStoreAccess {
   id         Int      @id @default(autoincrement())
   user_id    Int

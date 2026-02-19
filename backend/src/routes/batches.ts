@@ -5,6 +5,7 @@ import { ApiResponse, OffsetPaginatedResponse } from '../types';
 import { BadRequestError, NotFoundError } from '../middleware/errorHandler';
 import { processTiffScan } from '../services/batchProcessor';
 import { logger } from '../utils/logger';
+import { logAuditEvent } from '../services/auditService';
 import { requireMinimumRole, requireRole } from '../middleware/authorize';
 import { buildStoreWhereClause } from '../utils/storeFilter';
 import { serializeBigIntFields } from '../utils/serialize';
@@ -217,6 +218,14 @@ router.post(
       });
 
       logger.info(`Reprocessing batch ${id}`);
+      void logAuditEvent({
+        userId: req.user!.userId,
+        userEmail: req.user!.email,
+        action: 'batch.reprocess',
+        resourceType: 'batch',
+        resourceId: String(id),
+        ipAddress: req.ip,
+      });
 
       setImmediate(() => {
         processTiffScan(id).catch((err) => {

@@ -11,6 +11,7 @@ import { BatchViewer } from './pages/BatchViewer';
 import { Stores } from './pages/Stores';
 import { Settings } from './pages/Settings';
 import { Login } from './pages/Login';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
             element={
               <ProtectedRoute>
                 <Layout>
+                  <ErrorBoundary>
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/documents" element={<Documents />} />
@@ -46,6 +48,7 @@ function App() {
                       }
                     />
                   </Routes>
+                  </ErrorBoundary>
                 </Layout>
               </ProtectedRoute>
             }

@@ -9,6 +9,7 @@ declare global {
     interface Request {
       user?: AccessTokenPayload;
       accessibleStoreIds?: number[] | null;
+      requestId?: string;
     }
   }
 }

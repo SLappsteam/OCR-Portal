@@ -5,6 +5,7 @@ import { clearStorageFiles } from '../services/storageService';
 import { ApiResponse } from '../types';
 import { logger } from '../utils/logger';
 import { BadRequestError } from '../middleware/errorHandler';
+import { logAuditEvent } from '../services/auditService';
 import { hasClientSecret } from '../services/oidcService';
 import { encryptSecret } from '../utils/oidcCrypto';
 
@@ -151,6 +152,14 @@ router.patch('/oidc', async (req: Request, res: Response, next: NextFunction) =>
     await prisma.$transaction(upserts);
 
     logger.info(`OIDC settings updated: enabled=${enabled}`);
+    void logAuditEvent({
+      userId: req.user!.userId,
+      userEmail: req.user!.email,
+      action: 'settings.update_oidc',
+      resourceType: 'settings',
+      details: { enabled, tenantId, clientId },
+      ipAddress: req.ip,
+    });
     res.json({ success: true, data: { enabled, tenantId, clientId } });
   } catch (error) {
     next(error);
