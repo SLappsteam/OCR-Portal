@@ -21,26 +21,32 @@ export function BatchViewer() {
     rotateLeft, rotateRight, resetView,
   } = useZoomPan();
 
+  // Fetch batch data when batch ID changes
   useEffect(() => {
     if (!id) return;
     const batchId = parseInt(id, 10);
 
     setIsLoading(true);
+    setBatch(null);
+    setCurrentPage(0);
+    setError(null);
+
     fetchBatchDocuments(batchId)
-      .then((data) => {
-        const batchData = data as BatchData;
-        setBatch(batchData);
-        const pageParam = searchParams.get('page');
-        if (pageParam) {
-          const page = parseInt(pageParam, 10);
-          if (!isNaN(page) && page >= 0 && page < batchData.page_count) {
-            setCurrentPage(page);
-          }
-        }
-      })
+      .then((data) => setBatch(data as BatchData))
       .catch((err: Error) => setError(err.message))
       .finally(() => setIsLoading(false));
   }, [id]);
+
+  // Sync currentPage from URL when batch loads or search params change
+  useEffect(() => {
+    if (!batch) return;
+    const pageParam = searchParams.get('page');
+    if (!pageParam) return;
+    const page = parseInt(pageParam, 10);
+    if (!isNaN(page) && page >= 0 && page < batch.page_count) {
+      setCurrentPage(page);
+    }
+  }, [batch, searchParams]);
 
   const goToPage = (page: number) => {
     if (!batch) return;

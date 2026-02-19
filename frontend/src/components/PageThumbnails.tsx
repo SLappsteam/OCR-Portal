@@ -19,9 +19,15 @@ export function PageThumbnails({
 }: PageThumbnailsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
+  const isInitialScroll = useRef(true);
 
   useEffect(() => {
-    if (selectedRef.current && containerRef.current) {
+    if (!selectedRef.current || !containerRef.current) return;
+
+    if (isInitialScroll.current) {
+      isInitialScroll.current = false;
+      selectedRef.current.scrollIntoView({ block: 'center', behavior: 'instant' });
+    } else {
       selectedRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
   }, [currentPage]);
@@ -56,11 +62,11 @@ export function PageThumbnails({
                   : 'border-gray-200 hover:border-gray-400'
               }`}
             >
-              <div className="relative">
+              <div className="relative aspect-[8.5/11] bg-gray-100">
                 <img
                   src={getBatchPreviewUrl(batchId, i)}
                   alt={`Page ${i}`}
-                  className="w-full h-auto rounded-t"
+                  className="w-full h-full object-contain rounded-t"
                   loading="lazy"
                 />
                 {doc && (
