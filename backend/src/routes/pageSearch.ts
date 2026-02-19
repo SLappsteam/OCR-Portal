@@ -17,7 +17,11 @@ const querySchema = z.object({
 const ALLOWED_FILTER_FIELDS = new Set([
   'customer_name', 'customer_id', 'order_id', 'phone',
   'fulfillment', 'salesperson', 'stat', 'zone',
-  'customer_code',
+  'customer_code', 'order_type', 'address', 'city_state_zip',
+  'ship_to_name', 'ship_to_address', 'ship_to_city_state_zip',
+  'delivery_date', 'truck_id', 'total_sale', 'stop',
+  'finance_company', 'financed_amount', 'grand_total',
+  'total_refund', 'payment_site', 'post_date',
 ]);
 
 function parseFieldFilters(raw: string | string[] | undefined) {
@@ -48,7 +52,11 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const searchFields = [
       'customer_name', 'order_id', 'customer_id', 'phone',
       'fulfillment', 'salesperson', 'stat', 'zone',
-      'customer_code',
+      'customer_code', 'order_type', 'address', 'city_state_zip',
+      'ship_to_name', 'ship_to_address', 'ship_to_city_state_zip',
+      'delivery_date', 'truck_id', 'total_sale', 'stop',
+      'finance_company', 'financed_amount', 'grand_total',
+      'total_refund', 'payment_site', 'post_date',
     ];
     const jsonOrFilters = searchFields.map((field) => ({
       fields: { path: [field], string_contains: search },

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { type SortingState } from '@tanstack/react-table';
 import { toast } from 'react-toastify';
@@ -12,9 +12,9 @@ import { DocumentsTable } from '../components/DocumentsTable';
 import { PageSearchTable } from '../components/PageSearchTable';
 import { SearchFilterBar } from '../components/SearchFilterBar';
 import { Pagination } from '../components/Pagination';
+import { useDocumentFilters } from '../hooks/useDocumentFilters';
 import type { DocumentRow } from '../components/docTypeIcons';
 import type { PageSearchResult } from '../types/extraction';
-import type { FieldFilter } from '../types/filters';
 
 const PAGE_SIZE = 100;
 
@@ -26,30 +26,24 @@ export function Documents() {
   const [docTypes, setDocTypes] = useState<{ code: string; name: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [fieldFilters, setFieldFilters] = useState<FieldFilter[]>([]);
 
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
-  const [filters, setFilters] = useState({
-    storeNumber: '',
-    documentType: '',
-    startDate: '',
-    endDate: '',
-    search: '',
-    excludeCoversheets: true,
-  });
-  const [searchInput, setSearchInput] = useState('');
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const {
+    filters,
+    setFilters,
+    fieldFilters,
+    setFieldFilters,
+    searchInput,
+    handleSearchChange,
+    page,
+    setPage,
+    hasActiveFilters,
+    clearAll,
+  } = useDocumentFilters();
 
-  const handleSearchChange = useCallback((value: string) => {
-    setSearchInput(value);
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setFilters((f) => ({ ...f, search: value }));
-    }, 400);
-  }, []);
+  const isInitialMount = useRef(true);
 
   useEffect(() => {
     Promise.all([fetchStores(), fetchDocumentTypes()])
@@ -98,8 +92,13 @@ export function Documents() {
   };
 
   useEffect(() => {
-    setPage(1);
-    loadDocuments(1);
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      loadDocuments(page);
+    } else {
+      setPage(1);
+      loadDocuments(1);
+    }
   }, [filters, fieldFilters]);
 
   const handlePageChange = (newPage: number) => {
@@ -151,6 +150,8 @@ export function Documents() {
           excludeCoversheets: filters.excludeCoversheets,
           onExcludeCoversheetChange: (v) => setFilters((f) => ({ ...f, excludeCoversheets: v })),
         }}
+        hasActiveFilters={hasActiveFilters}
+        onClearAll={clearAll}
       />
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">

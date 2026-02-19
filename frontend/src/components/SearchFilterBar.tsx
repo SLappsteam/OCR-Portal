@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { FieldFilterBar } from './FieldFilterBar';
 import type { FieldFilter } from '../types/filters';
 
@@ -36,6 +36,8 @@ interface SearchFilterBarProps {
   storeFilterProps: StoreFilterProps;
   docTypeFilterProps: DocTypeFilterProps;
   dateFilterProps: DateFilterProps;
+  hasActiveFilters?: boolean;
+  onClearAll?: () => void;
 }
 
 export function SearchFilterBar({
@@ -43,6 +45,8 @@ export function SearchFilterBar({
   storeFilterProps,
   docTypeFilterProps,
   dateFilterProps,
+  hasActiveFilters,
+  onClearAll,
 }: SearchFilterBarProps) {
   const { searchInput, onSearchChange, isSearchMode, fieldFilters, onFieldFiltersChange } = searchProps;
   const { storeNumber, onStoreChange, stores } = storeFilterProps;
@@ -118,6 +122,17 @@ export function SearchFilterBar({
               </label>
             )}
           </>
+        )}
+
+        {hasActiveFilters && onClearAll && (
+          <button
+            type="button"
+            onClick={onClearAll}
+            className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded hover:bg-gray-50"
+          >
+            <X size={14} />
+            Clear All Filters
+          </button>
         )}
       </div>
 
