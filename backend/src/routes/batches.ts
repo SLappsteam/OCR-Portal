@@ -20,6 +20,10 @@ const router = Router();
 const querySchema = z.object({
   storeNumber: z.string().optional(),
   status: z.string().optional(),
+  batchType: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  search: z.string().optional(),
   parentOnly: z.string().optional(),
 }).merge(offsetPaginationSchema);
 
@@ -34,14 +38,32 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       throw new BadRequestError('Invalid query parameters');
     }
 
-    const { storeNumber, status, parentOnly, page, limit } = parsed.data;
+    const { storeNumber, status, batchType, startDate, endDate, search, parentOnly, page, limit } = parsed.data;
     const storeScope = buildStoreWhereClause(req.accessibleStoreIds);
 
-    const where = {
+    const where: Record<string, unknown> = {
       ...storeScope,
       store: storeNumber ? { store_number: storeNumber } : undefined,
-      status: status ?? undefined,
+      status: status || undefined,
+      batch_type: batchType || undefined,
       parent_batch_id: parentOnly === 'true' ? null : undefined,
+      ...(startDate || endDate
+        ? {
+            created_at: {
+              ...(startDate ? { gte: new Date(startDate) } : {}),
+              ...(endDate ? { lte: new Date(endDate + 'T23:59:59.999Z') } : {}),
+            },
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { file_name: { contains: search, mode: 'insensitive' } },
+              { reference: { contains: search, mode: 'insensitive' } },
+              { batch_type: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
     };
 
     const [batches, totalCount] = await Promise.all([

@@ -306,12 +306,20 @@ export async function updateDocument(id: number, data: { documentTypeId?: number
 export async function fetchBatches(params?: {
   storeNumber?: string;
   status?: string;
+  batchType?: string;
+  startDate?: string;
+  endDate?: string;
+  search?: string;
   page?: number;
   limit?: number;
 }): Promise<PaginatedResponse<unknown>> {
   const searchParams = new URLSearchParams();
   if (params?.storeNumber) searchParams.set('storeNumber', params.storeNumber);
   if (params?.status) searchParams.set('status', params.status);
+  if (params?.batchType) searchParams.set('batchType', params.batchType);
+  if (params?.startDate) searchParams.set('startDate', params.startDate);
+  if (params?.endDate) searchParams.set('endDate', params.endDate);
+  if (params?.search) searchParams.set('search', params.search);
   if (params?.page) searchParams.set('page', params.page.toString());
   searchParams.set('limit', (params?.limit ?? 100).toString());
 

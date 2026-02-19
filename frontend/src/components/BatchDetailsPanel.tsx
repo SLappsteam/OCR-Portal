@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Layers, AlertCircle } from 'lucide-react';
+import { FileText, Layers, AlertCircle, AlertTriangle } from 'lucide-react';
 import { fetchBatchDocuments } from '../api/client';
 
 interface DocumentRow {
@@ -168,8 +168,13 @@ export function BatchDetailsPanel({ batchId }: Props) {
                   </td>
                   <td className="px-3 py-2">
                     {doc?.documentType?.name ?? (
-                      <span className={hasDoc ? 'text-gray-400 italic' : 'text-amber-600 flex items-center gap-1'}>
-                        {hasDoc ? 'Unclassified' : (
+                      <span className={hasDoc ? 'text-red-600 font-medium flex items-center gap-1' : 'text-amber-600 flex items-center gap-1'}>
+                        {hasDoc ? (
+                          <>
+                            <AlertTriangle size={14} />
+                            Unclassified
+                          </>
+                        ) : (
                           <>
                             <AlertCircle size={14} />
                             No document

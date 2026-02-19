@@ -73,11 +73,18 @@ export function buildBatchColumns({
     {
       accessorKey: 'batch_type',
       header: 'Type',
-      cell: ({ row }) => (
-        <span className="text-sm">
-          {row.original.batch_type ?? '-'}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const type = row.original.batch_type;
+        if (type === 'UNCLASSIFIED') {
+          return (
+            <span className="text-sm text-red-600 font-medium flex items-center gap-1">
+              <AlertTriangle size={14} />
+              Unclassified
+            </span>
+          );
+        }
+        return <span className="text-sm">{type ?? '-'}</span>;
+      },
     },
     {
       accessorKey: 'file_name',

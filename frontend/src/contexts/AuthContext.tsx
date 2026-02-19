@@ -15,6 +15,7 @@ import {
   refreshAccessToken,
   fetchCurrentUser,
 } from '../api/authApi';
+import { toast } from 'react-toastify';
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -37,6 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSessionExpiredHandler(() => {
       setAccessToken(null);
       setUser(null);
+      toast.warn('Session timed out. Please log in again.');
     });
   }, []);
 
