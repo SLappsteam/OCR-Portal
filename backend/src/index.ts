@@ -34,7 +34,22 @@ const WATCH_FOLDER_PATH = process.env['WATCH_FOLDER_PATH'] ?? './watch';
 let server: Server | null = null;
 
 app.set('trust proxy', 1);
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: {
+    useDefaults: false,
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      frameSrc: ["'none'"],
+    },
+  },
+}));
 app.use(requestId);
 app.use(cors({
   origin: process.env['FRONTEND_URL'] ?? 'http://localhost:5173',
