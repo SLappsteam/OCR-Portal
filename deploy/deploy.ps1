@@ -53,16 +53,21 @@ function Test-CommandExists {
 function Stop-BackendProcess {
     Write-Step 'Stopping backend...'
 
-    # Try PM2 first
-    if (Test-CommandExists 'pm2') {
-        $pm2List = pm2 jlist 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
+    # Use local pm2 from project dependencies
+    Push-Location "$DEPLOY_PATH\backend"
+    try {
+        $pm2List = npx pm2 jlist 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
         $running = $pm2List | Where-Object { $_.name -eq $PM2_NAME -and $_.pm2_env.status -eq 'online' }
         if ($running) {
-            pm2 stop $PM2_NAME 2>$null
+            npx pm2 stop $PM2_NAME 2>$null
             Write-Ok "Stopped PM2 process '$PM2_NAME'"
+            Pop-Location
             return
         }
+    } catch {
+        # PM2 not yet installed or no processes — fall through to port kill
     }
+    Pop-Location
 
     # Fallback: kill process on port
     $conn = netstat -ano | Select-String ":$BACKEND_PORT\s+.*LISTENING\s+(\d+)"
@@ -76,19 +81,19 @@ function Stop-BackendProcess {
 }
 
 function Start-BackendProcess {
+    param([string]$Env = '')
+
     Write-Step 'Starting backend...'
     Push-Location "$DEPLOY_PATH\backend"
 
-    if (Test-CommandExists 'pm2') {
-        pm2 start dist/index.js --name $PM2_NAME --cwd "$DEPLOY_PATH\backend" 2>$null
-        Write-Ok "Started via PM2 as '$PM2_NAME'"
-    } else {
-        # Fallback: start detached node process
-        Start-Process -FilePath 'node' -ArgumentList 'dist/index.js' `
-            -WorkingDirectory "$DEPLOY_PATH\backend" `
-            -WindowStyle Hidden -PassThru | Out-Null
-        Write-Ok 'Started as detached node process'
-    }
+    $envFlag = if ($Env) { "--env $Env" } else { '' }
+    $cmd = "npx pm2 start ecosystem.config.js $envFlag"
+    Invoke-Expression $cmd 2>$null
+    Write-Ok "Started via PM2 as '$PM2_NAME' (env: $Env)"
+
+    # Save PM2 process list so it survives reboots
+    npx pm2 save 2>$null
+    Write-Ok 'PM2 process list saved'
 
     Pop-Location
 }
@@ -152,7 +157,8 @@ function Invoke-Rollback {
         Write-Ok 'Backend .env restored'
     }
 
-    Start-BackendProcess
+    $rollbackEnv = if ($Environment) { $Environment } else { $env:ENVIRONMENT }
+    Start-BackendProcess -Env $rollbackEnv
 
     if (Test-HealthCheck) {
         Write-Ok "Rollback to $BackupTimestamp succeeded"
@@ -345,7 +351,7 @@ try {
 Pop-Location
 
 # ── Step 6: Start ──────────────────────────────────────────────
-Start-BackendProcess
+Start-BackendProcess -Env $Environment
 
 # ── Step 7: Verify ─────────────────────────────────────────────
 if (Test-HealthCheck) {
@@ -354,6 +360,7 @@ if (Test-HealthCheck) {
     Write-Host "  DEPLOY SUCCEEDED — $($Environment.ToUpper())" -ForegroundColor Green
     Write-Host "  Backend:  http://localhost:$BACKEND_PORT" -ForegroundColor Green
     Write-Host "  Health:   $HEALTH_URL" -ForegroundColor Green
+    Write-Host "  PM2:      npx pm2 status / npx pm2 logs" -ForegroundColor Green
     Write-Host "  Backup:   $TIMESTAMP" -ForegroundColor Gray
     Write-Host "============================================" -ForegroundColor Green
 } else {

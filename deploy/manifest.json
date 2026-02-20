@@ -16,15 +16,17 @@
         "expectedStatus": 200,
         "timeoutSeconds": 30
       },
-      "processManager": "pm2",
+      "processManager": "pm2 (local dependency — no global install required)",
       "pm2Name": "ocr-portal-backend",
+      "pm2Config": "ecosystem.config.js",
       "buildCommands": [
         "npm ci --production=false",
         "npx prisma generate",
         "npm run build"
       ],
-      "startCommand": "npm start",
-      "stopCommand": "npm run stop"
+      "startCommand": "npm run start:qa (or start:prod)",
+      "stopCommand": "npm run pm2:stop",
+      "statusCommand": "npm run pm2:status"
     },
     "frontend": {
       "path": "frontend",

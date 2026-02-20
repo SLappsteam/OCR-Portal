@@ -2,6 +2,7 @@ import express, { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import path from 'path';
 import { Server } from 'http';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
@@ -45,6 +46,18 @@ app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 app.use(generalLimiter);
 
 app.use('/', routes);
+
+// In non-development, serve the frontend SPA from ../frontend/dist
+if (process.env['NODE_ENV'] !== 'development') {
+  const frontendDist = path.join(__dirname, '..', '..', 'frontend', 'dist');
+  app.use(express.static(frontendDist));
+  app.get('*', (_req, res, next) => {
+    if (_req.path.startsWith('/api') || _req.path.startsWith('/health')) {
+      return next();
+    }
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
 
 app.use(errorHandler);
 

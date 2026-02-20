@@ -127,9 +127,9 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       totalCount,
       totalPages: calculateTotalPages(totalCount, limit),
     };
-    res.json(response);
+    return res.json(response);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
